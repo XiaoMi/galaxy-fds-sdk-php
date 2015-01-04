@@ -793,6 +793,8 @@ class Request
             curl_setopt($ch, CURLOPT_SSLKEY,        $this->client_key);
             curl_setopt($ch, CURLOPT_SSLKEYPASSWD,  $this->client_passphrase);
             // curl_setopt($ch, CURLOPT_SSLCERTPASSWD,  $this->client_cert_passphrase);
+        } else {
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);
         }
 
         if ($this->hasTimeout()) {
