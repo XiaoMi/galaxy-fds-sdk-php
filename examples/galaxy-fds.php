@@ -12,13 +12,15 @@ require(__DIR__ . "/../bootstrap.php");
 $access_key = "your_access_key";
 $access_secret = "your_access_secret";
 $credential = new \FDS\credential\BasicFDSCredential($access_key, $access_secret);
+$fds_config = new \FDS\FDSClientConfiguration();
+$fds_config->enableHttps(true);
+$fds_config->enableCdnForUpload(false);
+$fds_config->enableCdnForDownload(true);
 
-$fds_address = "http://files.fds.api.xiaomi.com/";
-
-$fds_client = new \FDS\GalaxyFDSClient($credential, $fds_address);
+$fds_client = new \FDS\GalaxyFDSClient($credential, $fds_config);
+$bucket_name = "php-sdk-example-bucket-name";
 
 // Check and create the bucket
-$bucket_name = "php-sdk-example";
 if (!$fds_client->doesBucketExist($bucket_name)) {
   $fds_client->createBucket($bucket_name);
 }

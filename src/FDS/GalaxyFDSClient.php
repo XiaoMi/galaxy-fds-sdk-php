@@ -35,18 +35,31 @@ class GalaxyFDSClient implements GalaxyFDS {
   const APPLICATION_OCTET_STREAM = "application/octet-stream";
 
   private $credential;
-  private $fds_base_uri = Common::DEFAULT_FDS_SERVICE_BASE_URI;
+  private $fdsConfig;
   private $delimiter = "/";
 
-  public function __construct($credential, $server_base_uri = "") {
+  public function __construct($credential, $fdsConfigOrBaseUri = "") {
     $this->credential = $credential;
-    if (strlen($server_base_uri) > 0) {
-      $this->fds_base_uri = $server_base_uri;
+
+    if (is_string($fdsConfigOrBaseUri)) {
+      $this->fdsConfig = new FDSClientConfiguration();
+
+      if (empty($fdsConfigOrBaseUri)) {
+        $fdsConfigOrBaseUri = Common::DEFAULT_FDS_SERVICE_BASE_URI;
+      }
+
+      // Only considering the protocol used in fdsBaseUri, http(s), is enough
+      // for compatibility.
+      if (0 == strpos($fdsConfigOrBaseUri, "http://")) {
+        $this->fdsConfig->enableHttps(false);
+      }
+    } else {
+      $this->fdsConfig = $fdsConfigOrBaseUri;
     }
   }
 
   public function listBuckets() {
-    $uri = $this->formatUri("");
+    $uri = $this->formatUri($this->fdsConfig->getBaseUri(), "");
     $headers = $this->prepareRequestHeader($uri, Http::GET, NULL);
     $response = Request::get($uri)
       ->addHeaders($headers)
@@ -72,7 +85,7 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function createBucket($bucket_name) {
-    $uri = $this->formatUri($bucket_name);
+    $uri = $this->formatUri($this->fdsConfig->getBaseUri(), $bucket_name);
     $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
     $response = Request::put($uri, "{}")
       ->addHeaders($headers)
@@ -87,7 +100,7 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function deleteBucket($bucket_name) {
-    $uri = $this->formatUri($bucket_name);
+    $uri = $this->formatUri($this->fdsConfig->getBaseUri(), $bucket_name);
     $headers = $this->prepareRequestHeader($uri, Http::DELETE, NULL);
     $response = Request::delete($uri)
       ->addHeaders($headers)
@@ -102,7 +115,7 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function doesBucketExist($bucket_name) {
-    $uri = $this->formatUri($bucket_name);
+    $uri = $this->formatUri($this->fdsConfig->getBaseUri(), $bucket_name);
     $headers = $this->prepareRequestHeader($uri, Http::HEAD, NULL);
     $response = Request::head($uri)
       ->addHeaders($headers)
@@ -121,7 +134,7 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function getBucketAcl($bucket_name) {
-    $uri = $this->formatUri($bucket_name, SubResource::ACL);
+    $uri = $this->formatUri($this->fdsConfig->getBaseUri(), $bucket_name, SubResource::ACL);
     $headers = $this->prepareRequestHeader($uri, Http::GET, Mime::JSON);
     $response = Request::get($uri)
       ->expects(Mime::JSON)
@@ -140,7 +153,7 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function setBucketAcl($bucket_name, $acl) {
-    $uri = $this->formatUri($bucket_name, SubResource::ACL);
+    $uri = $this->formatUri($this->fdsConfig->getBaseUri(), $bucket_name, SubResource::ACL);
     $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
     $response = Request::put($uri, json_encode($this->aclToAcp($acl)))
       ->addHeaders($headers)
@@ -155,7 +168,7 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function listObjects($bucket_name, $prefix = "") {
-    $uri = $this->formatUri($bucket_name, "prefix=" . $prefix,
+    $uri = $this->formatUri($this->fdsConfig->getBaseUri(), $bucket_name, "prefix=" . $prefix,
       "delimiter=" . $this->delimiter);
     $headers = $this->prepareRequestHeader($uri, Http::GET, Mime::JSON);
     $response = Request::get($uri)
@@ -183,7 +196,7 @@ class GalaxyFDSClient implements GalaxyFDS {
     $bucket_name = $previous_object_listing->getBucketName();
     $prefix = $previous_object_listing->getPrefix();
     $marker = $previous_object_listing->getNextMarker();
-    $uri = $this->formatUri($bucket_name, "prefix=" . $prefix,
+    $uri = $this->formatUri($this->fdsConfig->getBaseUri(), $bucket_name, "prefix=" . $prefix,
       "marker=" . $marker);
     $headers = $this->prepareRequestHeader($uri, Http::GET, Mime::JSON);
 
@@ -205,7 +218,8 @@ class GalaxyFDSClient implements GalaxyFDS {
 
   public function putObject($bucket_name, $object_name, $content,
                             $metadata = NULL) {
-    $uri = $this->formatUri($bucket_name . "/" . $object_name);
+    $uri = $this->formatUri($this->fdsConfig->getUploadBaseUri(),
+        $bucket_name . "/" . $object_name);
     $header = $this->prepareRequestHeader($uri, Http::PUT,
       self::APPLICATION_OCTET_STREAM, $metadata);
 
@@ -225,7 +239,8 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function postObject($bucket_name, $content, $metadata = NULL) {
-    $uri = $this->formatUri($bucket_name . "/");
+    $uri = $this->formatUri($this->fdsConfig->getUploadBaseUri(),
+        $bucket_name . "/");
     $header = $this->prepareRequestHeader($uri, Http::POST,
       self::APPLICATION_OCTET_STREAM, $metadata);
 
@@ -244,7 +259,8 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function getObject($bucket_name, $object_name) {
-    $uri = $this->formatUri($bucket_name . "/" . $object_name);
+    $uri = $this->formatUri($this->fdsConfig->getDownloadBaseUri(),
+        $bucket_name . "/" . $object_name);
     $headers = $this->prepareRequestHeader($uri, Http::GET, NULL);
 
     $response = Request::get($uri)
@@ -273,7 +289,8 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function getObjectMetadata($bucket_name, $object_name) {
-    $uri = $this->formatUri($bucket_name . "/" . $object_name,
+    $uri = $this->formatUri($this->fdsConfig->getBaseUri(),
+        $bucket_name . "/" . $object_name,
       SubResource::METADATA);
     $headers = $this->prepareRequestHeader($uri, Http::GET, Mime::JSON);
 
@@ -294,7 +311,8 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function getObjectAcl($bucket_name, $object_name) {
-    $uri = $this->formatUri($bucket_name . "/" . $object_name,
+    $uri = $this->formatUri($this->fdsConfig->getBaseUri(),
+        $bucket_name . "/" . $object_name,
       SubResource::ACL);
     $headers = $this->prepareRequestHeader($uri, Http::GET, Mime::JSON);
 
@@ -316,7 +334,8 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function setObjectAcl($bucket_name, $object_name, $acl) {
-    $uri = $this->formatUri($bucket_name . "/" . $object_name,
+    $uri = $this->formatUri($this->fdsConfig->getBaseUri(),
+        $bucket_name . "/" . $object_name,
       SubResource::ACL);
     $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
 
@@ -333,7 +352,8 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function doesObjectExist($bucket_name, $object_name) {
-    $uri = $this->formatUri($bucket_name . "/" . $object_name);
+    $uri = $this->formatUri($this->fdsConfig->getBaseUri(),
+        $bucket_name . "/" . $object_name);
     $headers = $this->prepareRequestHeader($uri, Http::HEAD, Mime::JSON);
 
     $response = Request::head($uri)
@@ -353,7 +373,8 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function deleteObject($bucket_name, $object_name) {
-    $uri = $this->formatUri($bucket_name . "/" . $object_name);
+    $uri = $this->formatUri($this->fdsConfig->getBaseUri(),
+        $bucket_name . "/" . $object_name);
     $headers = $this->prepareRequestHeader($uri, Http::DELETE, NULL);
 
     $response = Request::delete($uri)
@@ -370,7 +391,8 @@ class GalaxyFDSClient implements GalaxyFDS {
 
   public function renameObject($bucket_name, $src_object_name,
                                $dst_object_name) {
-    $uri = $this->formatUri($bucket_name . "/" . $src_object_name,
+    $uri = $this->formatUri($this->fdsConfig->getBaseUri(),
+        $bucket_name . "/" . $src_object_name,
       "renameTo=" . $dst_object_name);
     $headers = $this->prepareRequestHeader($uri, Http::PUT,
       self::APPLICATION_OCTET_STREAM);
@@ -432,10 +454,7 @@ class GalaxyFDSClient implements GalaxyFDS {
     }
 
     // 3. Set authorization information
-    $sign_uri = $uri;
-    if (strlen($this->fds_base_uri) > 0) {
-      $sign_uri = substr($uri, strlen($this->fds_base_uri) - 1);
-    }
+    $sign_uri = substr($uri, strpos($uri, "/", strpos($uri, ":") +3));
     $signature = Signer::signToBase64($http_method, $sign_uri, $headers,
       $this->credential->getGalaxyAccessSecret(), self::SIGN_ALGORITHM);
     $auth_string = "Galaxy-V2 " . $this->credential->getGalaxyAccessId()
@@ -451,12 +470,12 @@ class GalaxyFDSClient implements GalaxyFDS {
     }
 
     $count = 0;
-    $uri = $this->fds_base_uri;
+    $uri = "";
     $args = func_get_args();
     foreach ($args as $arg) {
-      if ($count == 0) {
+      if ($count == 0 || $count == 1) {
         $uri .= $arg;
-      } else if ($count == 1) {
+      } else if ($count == 2) {
         $uri .= "?" . $arg;
       } else {
         $uri .= "&" . $arg;
