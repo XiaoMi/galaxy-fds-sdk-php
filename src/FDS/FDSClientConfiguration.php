@@ -14,8 +14,8 @@ class FDSClientConfiguration {
   const URI_HTTPS_PREFIX = "https://";
   const URI_FILES = "files";
   const URI_CDN = "cdn";
-  const URI_CDNS = "cdns";
   const URI_FDS_SUFFIX = ".fds.api.xiaomi.com/";
+  const URI_FDS_SSL_SUFFIX = ".fds-ssl.api.xiaomi.com/";
 
   private $regionName;
   private $enableHttps;
@@ -80,46 +80,50 @@ class FDSClientConfiguration {
   }
 
   public function getBaseUri() {
-    return $this->buildBaseUri(self::URI_FILES);
+    return $this->buildBaseUri(false);
   }
 
   public function getCdnBaseUri() {
-    return $this->buildBaseUri($this->getCdnRegionNameSuffix());
+    return $this->buildBaseUri(true);
   }
 
   public function getDownloadBaseUri() {
-    if ($this->enableCdnForDownload) {
-      return $this->buildBaseUri($this->getCdnRegionNameSuffix());
-    }
-    else {
-      return $this->buildBaseUri(self::URI_FILES);
-    }
+    return $this->buildBaseUri($this->enableCdnForDownload);
   }
 
   public function getUploadBaseUri() {
-    if ($this->enableCdnForUpload) {
-      return $this->buildBaseUri($this->getCdnRegionNameSuffix());
-    }
-    else {
-      return $this->buildBaseUri(self::URI_FILES);
-    }
+    return $this->buildBaseUri($this->enableCdnForUpload);
   }
 
-  public function buildBaseUri($regionNameSuffix) {
+  public function buildBaseUri($enableCdn) {
     if ($this->enableUnitTestMode) {
       return $this->baseUriForUnitTest;
     }
 
     $uri = $this->enableHttps ? self::URI_HTTPS_PREFIX : self::URI_HTTP_PREFIX;
-    if (!empty($this->regionName)) {
-      $uri .= $this->regionName . "-";
-    }
-    $uri .= $regionNameSuffix;
-    $uri .= self::URI_FDS_SUFFIX;
+    $uri .= $this->getBaseUriPrefix($enableCdn, $this->regionName);
+    $uri .= $this->getBaseUriSuffix($enableCdn, $this->enableHttps);
     return $uri;
   }
 
-  private function getCdnRegionNameSuffix() {
-    return $this->enableHttps ? self::URI_CDNS : self::URI_CDN;
+  private function  getBaseUriPrefix($enableCdn, $regionName) {
+    if (empty($regionName)) {
+      if ($enableCdn) {
+        return self::URI_CDN;
+      }
+      return self::URI_FILES;
+    } else {
+      if ($enableCdn) {
+        return $regionName . '-' . self::URI_CDN;
+      }
+      return $regionName . '-' . self::URI_FILES;
+    }
+  }
+
+  private function getBaseUriSuffix($enableCdn, $enableHttps) {
+    if ($enableCdn && $enableHttps) {
+      return self::URI_FDS_SSL_SUFFIX;
+    }
+    return self::URI_FDS_SUFFIX;
   }
 }
