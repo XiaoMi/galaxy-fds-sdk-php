@@ -17,70 +17,72 @@ class FDSClientConfiguration {
   const URI_FDS_SUFFIX = ".fds.api.xiaomi.com/";
   const URI_FDS_SSL_SUFFIX = ".fds-ssl.api.xiaomi.com/";
   const DEFAULT_RETRY_NUM = 3;
+  const DEFAULT_CONNECTION_TIMEOUT_SECS = 30;
 
-  private $regionName;
-  private $enableHttps;
-  private $enableCdnForUpload;
-  private $enableCdnForDownload;
-  private $enableDebug;
+  private $region_name;
+  private $enable_https;
+  private $enable_cdn_for_upload;
+  private $enable_cdn_for_download;
+  private $enable_debug;
   private $retry;
+  private $connection_timeout_secs;
 
-  private $enableUnitTestMode;
-  private $baseUriForUnitTest;
+  private $enable_unit_test_mode;
+  private $base_uri_for_unit_test;
 
   public function __construct() {
-    $this->enableHttps = true;
-    $this->regionName = "";
-    $this->enableCdnForUpload = false;
-    $this->enableCdnForDownload = true;
-    $this->enableDebug = false;
+    $this->enable_https = true;
+    $this->region_name = "";
+    $this->enable_cdn_for_upload = false;
+    $this->enable_cdn_for_download = true;
+    $this->enable_debug = false;
 
-    $this->enableUnitTestMode = false;
-    $this->baseUriForUnitTest = "";
+    $this->enable_unit_test_mode = false;
+    $this->base_uri_for_unit_test = "";
   }
 
   public function getRegionName() {
-    return $this->regionName;
+    return $this->region_name;
   }
 
-  public function setRegionName($regionName) {
-    $this->regionName = $regionName;
+  public function setRegionName($region_name) {
+    $this->region_name = $region_name;
   }
 
   public function isHttpsEnabled() {
-    return $this->enableHttps;
+    return $this->enable_https;
   }
 
-  public function enableHttps($enableHttps) {
-    $this->enableHttps = $enableHttps;
+  public function enableHttps($enable_https) {
+    $this->enable_https = $enable_https;
   }
 
   public function isCdnEnabledForUpload() {
-    return $this->enableCdnForUpload;
+    return $this->enable_cdn_for_upload;
   }
 
-  public function enableCdnForUpload($enableCdnForUpload) {
-    $this->enableCdnForUpload = $enableCdnForUpload;
+  public function enableCdnForUpload($enable_cdn_for_upload) {
+    $this->enable_cdn_for_upload = $enable_cdn_for_upload;
   }
 
   public function isCdnEnabledForDownload() {
-    return $this->enableCdnForDownload;
+    return $this->enable_cdn_for_download;
   }
 
-  public function enableCdnForDownload($enableCdnForDownload) {
-    $this->enableCdnForDownload = $enableCdnForDownload;
+  public function enableCdnForDownload($enable_cdn_for_download) {
+    $this->enable_cdn_for_download = $enable_cdn_for_download;
   }
 
   public function isEnabledUnitTestMode() {
-    return $this->enableUnitTestMode;
+    return $this->enable_unit_test_mode;
   }
 
-  public function enableUnitTestMode($enableUnitTestMode) {
-    $this->enableUnitTestMode = $enableUnitTestMode;
+  public function enableUnitTestMode($enable_unit_test_mode) {
+    $this->enable_unit_test_mode = $enable_unit_test_mode;
   }
 
-  public function setBaseUriForUnitTest($baseUriForUnitTest) {
-    $this->baseUriForUnitTest = $baseUriForUnitTest;
+  public function setBaseUriforunittest($base_uri_for_unit_test) {
+    $this->base_uri_for_unit_test = $base_uri_for_unit_test;
   }
 
   public function getBaseUri() {
@@ -92,21 +94,21 @@ class FDSClientConfiguration {
   }
 
   public function getDownloadBaseUri() {
-    return $this->buildBaseUri($this->enableCdnForDownload);
+    return $this->buildBaseUri($this->enable_cdn_for_download);
   }
 
   public function getUploadBaseUri() {
-    return $this->buildBaseUri($this->enableCdnForUpload);
+    return $this->buildBaseUri($this->enable_cdn_for_upload);
   }
 
   public function buildBaseUri($enableCdn) {
-    if ($this->enableUnitTestMode) {
-      return $this->baseUriForUnitTest;
+    if ($this->enable_unit_test_mode) {
+      return $this->base_uri_for_unit_test;
     }
 
-    $uri = $this->enableHttps ? self::URI_HTTPS_PREFIX : self::URI_HTTP_PREFIX;
-    $uri .= $this->getBaseUriPrefix($enableCdn, $this->regionName);
-    $uri .= $this->getBaseUriSuffix($enableCdn, $this->enableHttps);
+    $uri = $this->enable_https ? self::URI_HTTPS_PREFIX : self::URI_HTTP_PREFIX;
+    $uri .= $this->getBaseUriPrefix($enableCdn, $this->region_name);
+    $uri .= $this->getBaseUriSuffix($enableCdn, $this->enable_https);
     return $uri;
   }
 
@@ -132,11 +134,11 @@ class FDSClientConfiguration {
   }
 
   public function isDebugEnabled() {
-    return $this->enableDebug;
+    return $this->enable_debug;
   }
 
   public function enableDebug($enableDebug) {
-    $this->enableDebug = $enableDebug;
+    $this->enable_debug = $enableDebug;
   }
 
   public function setRetry($retry) {
@@ -145,5 +147,17 @@ class FDSClientConfiguration {
 
   public function getRetry() {
     return ($this->retry > 0 ? $this->retry : self::DEFAULT_RETRY_NUM);
+  }
+
+  public function setConnectionTimeoutSecs($timeout) {
+    $this->connection_timeout_secs = $timeout;
+  }
+
+  public function getConnectionTimeoutSecs() {
+    return $this->connection_timeout_secs;
+  }
+
+  public function  getDefaultConnectionTimeoutSecs() {
+    return self::DEFAULT_CONNECTION_TIMEOUT_SECS;
   }
 }

@@ -28,7 +28,7 @@ class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
   public static function setUpBeforeClass() {
     $fdsConfig = new FDSClientConfiguration();
     $fdsConfig->enableUnitTestMode(true);
-    $fdsConfig->setBaseUriForUnitTest("http://files.fds.api.xiaomi.com/");
+    $fdsConfig->setBaseUriforunittest("http://files.fds.api.xiaomi.com/");
     self::$credential = new BasicFDSCredential("5341713837557", "kdHiBtkOnejXTuND86fiVw==");
     self::$fds_client = new GalaxyFDSClient(self::$credential, $fdsConfig);
     self::$bucket_name = "test-php-sdk-bucket-name";
