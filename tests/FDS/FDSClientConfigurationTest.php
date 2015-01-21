@@ -18,13 +18,14 @@ class FDSClientConfigurationTest extends \PHPUnit_Framework_TestCase {
   const URI_FDS_SSL_SUFFIX = ".fds-ssl.api.xiaomi.com/";
 
   public function testDefaultConfigurationValue() {
-    $fdsConfig = new FDSClientConfiguration();
-    $this->assertEquals("", $fdsConfig->getRegionName());
-    $this->assertEquals(true, $fdsConfig->isHttpsEnabled());
-    $this->assertEquals(false, $fdsConfig->isCdnEnabledForUpload());
-    $this->assertEquals(true, $fdsConfig->isCdnEnabledForDownload());
-    $this->assertEquals(false, $fdsConfig->isEnabledUnitTestMode());
-    $this->assertEquals(3, $fdsConfig->getRetry());
+    $fds_config = new FDSClientConfiguration();
+    $this->assertEquals("", $fds_config->getRegionName());
+    $this->assertEquals(true, $fds_config->isHttpsEnabled());
+    $this->assertEquals(false, $fds_config->isCdnEnabledForUpload());
+    $this->assertEquals(true, $fds_config->isCdnEnabledForDownload());
+    $this->assertEquals(false, $fds_config->isEnabledUnitTestMode());
+    $this->assertEquals(3, $fds_config->getRetry());
+    $this->assertEquals(30, $fds_config->getDefaultConnectionTimeoutSecs());
   }
 
   public function testCdnChosen() {
@@ -56,23 +57,23 @@ class FDSClientConfigurationTest extends \PHPUnit_Framework_TestCase {
   }
 
   public function testBuildBaseUri() {
-    $regionName = "regionName";
+    $region_name = "regionName";
 
-    $fdsConfig = new FDSClientConfiguration();
+    $fds_config = new FDSClientConfiguration();
 
     // Test against flag enable https.
-    $fdsConfig->setRegionName("");
-    $fdsConfig->enableHttps(true);
+    $fds_config->setRegionName("");
+    $fds_config->enableHttps(true);
     $this->assertEquals("https://files" . self::URI_FDS_SUFFIX,
-        $fdsConfig->buildBaseUri(false));
-    $fdsConfig->enableHttps(false);
+        $fds_config->buildBaseUri(false));
+    $fds_config->enableHttps(false);
     $this->assertEquals("http://files" . self::URI_FDS_SUFFIX,
-        $fdsConfig->buildBaseUri(false));
+        $fds_config->buildBaseUri(false));
 
     // Test against region name.
-    $fdsConfig->setRegionName($regionName);
-    $fdsConfig->enableHttps(true);
-    $this->assertEquals("https://" . $regionName . "-cdn" .
-        self::URI_FDS_SSL_SUFFIX , $fdsConfig->buildBaseUri(true));
+    $fds_config->setRegionName($region_name);
+    $fds_config->enableHttps(true);
+    $this->assertEquals("https://" . $region_name . "-cdn" .
+        self::URI_FDS_SSL_SUFFIX , $fds_config->buildBaseUri(true));
   }
 }
