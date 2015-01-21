@@ -16,12 +16,14 @@ class FDSClientConfiguration {
   const URI_CDN = "cdn";
   const URI_FDS_SUFFIX = ".fds.api.xiaomi.com/";
   const URI_FDS_SSL_SUFFIX = ".fds-ssl.api.xiaomi.com/";
+  const DEFAULT_RETRY_NUM = 3;
 
   private $regionName;
   private $enableHttps;
   private $enableCdnForUpload;
   private $enableCdnForDownload;
   private $enableDebug;
+  private $retry;
 
   private $enableUnitTestMode;
   private $baseUriForUnitTest;
@@ -135,5 +137,13 @@ class FDSClientConfiguration {
 
   public function enableDebug($enableDebug) {
     $this->enableDebug = $enableDebug;
+  }
+
+  public function setRetry($retry) {
+    $this->retry = $retry;
+  }
+
+  public function getRetry() {
+    return ($this->retry > 0 ? $this->retry : self::DEFAULT_RETRY_NUM);
   }
 }

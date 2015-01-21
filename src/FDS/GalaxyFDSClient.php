@@ -64,6 +64,7 @@ class GalaxyFDSClient implements GalaxyFDS {
     $response = Request::get($uri)
       ->addHeaders($headers)
       ->expects(Mime::JSON)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code == self::HTTP_OK) {
@@ -90,6 +91,7 @@ class GalaxyFDSClient implements GalaxyFDS {
     $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
     $response = Request::put($uri, "{}")
       ->addHeaders($headers)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code != self::HTTP_OK) {
@@ -106,6 +108,7 @@ class GalaxyFDSClient implements GalaxyFDS {
     $headers = $this->prepareRequestHeader($uri, Http::DELETE, NULL);
     $response = Request::delete($uri)
       ->addHeaders($headers)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code != self::HTTP_OK) {
@@ -122,6 +125,7 @@ class GalaxyFDSClient implements GalaxyFDS {
     $headers = $this->prepareRequestHeader($uri, Http::HEAD, NULL);
     $response = Request::head($uri)
       ->addHeaders($headers)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code == self::HTTP_OK) {
@@ -143,6 +147,7 @@ class GalaxyFDSClient implements GalaxyFDS {
     $response = Request::get($uri)
       ->expects(Mime::JSON)
       ->addHeaders($headers)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code == self::HTTP_OK) {
@@ -162,6 +167,7 @@ class GalaxyFDSClient implements GalaxyFDS {
     $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
     $response = Request::put($uri, json_encode($this->aclToAcp($acl)))
       ->addHeaders($headers)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code != self::HTTP_OK) {
@@ -180,6 +186,7 @@ class GalaxyFDSClient implements GalaxyFDS {
     $response = Request::get($uri)
       ->addHeaders($headers)
       ->expects(Mime::JSON)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code == self::HTTP_OK) {
@@ -210,6 +217,7 @@ class GalaxyFDSClient implements GalaxyFDS {
     $response = Request::get($uri)
       ->addHeaders($headers)
       ->expects(Mime::JSON)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code == self::HTTP_OK) {
@@ -233,6 +241,7 @@ class GalaxyFDSClient implements GalaxyFDS {
 
     $response = Request::put($uri, $content)
       ->addHeaders($header)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code == self::HTTP_OK) {
@@ -255,6 +264,7 @@ class GalaxyFDSClient implements GalaxyFDS {
 
     $response = Request::post($uri, $content)
       ->addHeaders($header)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code == self::HTTP_OK) {
@@ -276,6 +286,7 @@ class GalaxyFDSClient implements GalaxyFDS {
     $response = Request::get($uri)
       ->addHeaders($headers)
       ->expects(self::APPLICATION_OCTET_STREAM)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code == self::HTTP_OK) {
@@ -307,6 +318,7 @@ class GalaxyFDSClient implements GalaxyFDS {
 
     $response = Request::get($uri)
       ->addHeaders($headers)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code == self::HTTP_OK) {
@@ -331,6 +343,7 @@ class GalaxyFDSClient implements GalaxyFDS {
     $response = Request::get($uri)
       ->addHeaders($headers)
       ->expects(Mime::JSON)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code == self::HTTP_OK) {
@@ -354,6 +367,7 @@ class GalaxyFDSClient implements GalaxyFDS {
 
     $response = Request::put($uri, json_encode($this->aclToAcp($acl)))
       ->addHeaders($headers)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code != self::HTTP_OK) {
@@ -372,6 +386,7 @@ class GalaxyFDSClient implements GalaxyFDS {
 
     $response = Request::head($uri)
       ->addHeaders($headers)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code == self::HTTP_OK) {
@@ -394,6 +409,7 @@ class GalaxyFDSClient implements GalaxyFDS {
 
     $response = Request::delete($uri)
       ->addHeaders($headers)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code != self::HTTP_OK) {
@@ -415,6 +431,7 @@ class GalaxyFDSClient implements GalaxyFDS {
 
     $response = Request::put($uri)
       ->addHeaders($headers)
+      ->retry($this->fdsConfig->getRetry())
       ->send();
 
     if ($response->code != self::HTTP_OK) {
@@ -553,6 +570,7 @@ class GalaxyFDSClient implements GalaxyFDS {
     $response = Request::get($uri)
         ->expects(Mime::JSON)
         ->addHeaders($headers)
+        ->retry($this->fdsConfig->getRetry())
         ->send();
 
     if ($response->code == self::HTTP_OK) {
@@ -572,6 +590,7 @@ class GalaxyFDSClient implements GalaxyFDS {
     $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
     $response = Request::put($uri, json_encode($quota))
         ->addHeaders($headers)
+        ->retry($this->fdsConfig->getRetry())
         ->send();
 
     if ($response->code != self::HTTP_OK) {

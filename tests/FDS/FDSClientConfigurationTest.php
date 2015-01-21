@@ -24,6 +24,7 @@ class FDSClientConfigurationTest extends \PHPUnit_Framework_TestCase {
     $this->assertEquals(false, $fdsConfig->isCdnEnabledForUpload());
     $this->assertEquals(true, $fdsConfig->isCdnEnabledForDownload());
     $this->assertEquals(false, $fdsConfig->isEnabledUnitTestMode());
+    $this->assertEquals(3, $fdsConfig->getRetry());
   }
 
   public function testCdnChosen() {
