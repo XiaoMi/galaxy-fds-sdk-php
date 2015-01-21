@@ -80,6 +80,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "List buckets failed for current user, status=" .
         $response->code . ", reason=" . $response->raw_body;
       // TODO(wuzesheng) Write error log
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -95,6 +96,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "Create bucket failed, status=" . $response->code .
         ", bucket_name=" . $bucket_name .
         ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -110,6 +112,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "Delete bucket failed, status=" . $response->code .
         ", bucket_name=" . $bucket_name .
         ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -129,6 +132,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "Check bucket existence failed, status=" . $response->code .
         ", bucket_name=" . $bucket_name .
         ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -148,6 +152,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "Get bucket acl failed, status=" . $response->code .
         ", bucket_name=" . $bucket_name .
         ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -163,6 +168,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "Set bucket acl failed, status=" . $response->code .
         ", bucket_name=" . $bucket_name .
         ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -183,6 +189,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "List objects failed, status=" . $response->code .
         ", bucket_name=" . $bucket_name . ", prefix=" . $prefix .
         ", delimiter=" . $this->delimiter . ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -196,8 +203,8 @@ class GalaxyFDSClient implements GalaxyFDS {
     $bucket_name = $previous_object_listing->getBucketName();
     $prefix = $previous_object_listing->getPrefix();
     $marker = $previous_object_listing->getNextMarker();
-    $uri = $this->formatUri($this->fdsConfig->getBaseUri(), $bucket_name, "prefix=" . $prefix,
-      "marker=" . $marker);
+    $uri = $this->formatUri($this->fdsConfig->getBaseUri(), $bucket_name,
+      "prefix=" . $prefix, "marker=" . $marker);
     $headers = $this->prepareRequestHeader($uri, Http::GET, Mime::JSON);
 
     $response = Request::get($uri)
@@ -212,6 +219,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "List next batch of objects failed, status=" . $response->code
         . ", bucket_name=" . $bucket_name . ", prefix=" . $prefix .
         ", marker=" . $marker . ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -234,6 +242,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "Put object failed, status=" . $response->code .
         ", bucket_name=" . $bucket_name . ", object_name=" . $object_name .
         ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -254,6 +263,7 @@ class GalaxyFDSClient implements GalaxyFDS {
     } else {
       $message = "Post object failed, status=" . $response->code .
         ", bucket_name=" . $bucket_name . ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -284,6 +294,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "Get object failed, status=" . $response->code .
         ", bucket_name=" . $bucket_name . ", object_name=" . $object_name .
         ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -306,6 +317,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "Get object metadata failed, status=" . $response->code .
         ", bucket_name=" . $bucket_name . ", object_name=" . $object_name .
         ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -329,6 +341,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "Get object acl failed, status=" . $response->code .
         ", bucket_name=" . $bucket_name . ", object_name=" . $object_name .
         ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -347,6 +360,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "Set object acl failed, status=" . $response->code .
         ", bucket_name=" . $bucket_name . ", object_name=" . $object_name .
         ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -368,6 +382,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "Check existence of object failed, status=" . $response->code
         . ", bucket_name=" . $bucket_name . ", object_name=" . $object_name
         . ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -385,6 +400,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "Delete object failed, status=" . $response->code .
         ", bucket_name=" . $bucket_name . ", object_name=" . $object_name .
         ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -407,6 +423,7 @@ class GalaxyFDSClient implements GalaxyFDS {
         ", src_object_name=" . $src_object_name .
         ", dst_object_name=" . $dst_object_name .
         ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -545,6 +562,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "Get bucket quota failed, status=" . $response->code .
           ", bucket_name=" . $bucket_name .
           ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
     }
   }
@@ -560,7 +578,14 @@ class GalaxyFDSClient implements GalaxyFDS {
       $message = "Set bucket quota failed, status=" . $response->code .
           ", bucket_name=" . $bucket_name .
           ", reason=" . $response->raw_body;
+      $this->printResponse($response);
       throw new GalaxyFDSClientException($message);
+    }
+  }
+
+  public function printResponse($response) {
+    if ($this->fdsConfig->isDebugEnabled()) {
+      print_r($response);
     }
   }
 }

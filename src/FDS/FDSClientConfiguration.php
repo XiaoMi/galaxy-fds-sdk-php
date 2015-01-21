@@ -21,6 +21,7 @@ class FDSClientConfiguration {
   private $enableHttps;
   private $enableCdnForUpload;
   private $enableCdnForDownload;
+  private $enableDebug;
 
   private $enableUnitTestMode;
   private $baseUriForUnitTest;
@@ -30,6 +31,7 @@ class FDSClientConfiguration {
     $this->regionName = "";
     $this->enableCdnForUpload = false;
     $this->enableCdnForDownload = true;
+    $this->enableDebug = false;
 
     $this->enableUnitTestMode = false;
     $this->baseUriForUnitTest = "";
@@ -125,5 +127,13 @@ class FDSClientConfiguration {
       return self::URI_FDS_SSL_SUFFIX;
     }
     return self::URI_FDS_SUFFIX;
+  }
+
+  public function isDebugEnabled() {
+    return $this->enableDebug;
+  }
+
+  public function enableDebug($enableDebug) {
+    $this->enableDebug = $enableDebug;
   }
 }
