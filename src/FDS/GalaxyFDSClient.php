@@ -467,7 +467,8 @@ class GalaxyFDSClient implements GalaxyFDS {
 
   public function generatePresignedUri($bucket_name, $object_name, $expiration,
                                        $http_method = "GET") {
-    $uri = $this->formatUri($bucket_name . "/" . $object_name,
+    $uri = $this->formatUri($this->fds_config->getDownloadBaseUri(),
+      $bucket_name . "/" . $object_name,
       Common::GALAXY_ACCESS_KEY_ID . "=" . $this->credential->getGalaxyAccessId(),
       Common::EXPIRES . "=" . $expiration);
     $signature = Signer::signToBase64($http_method, $uri, NULL,
