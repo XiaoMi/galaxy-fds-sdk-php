@@ -22,6 +22,9 @@ abstract class SubResource {
   const UPLOAD_ID = "uploadId";
   const STORAGE_ACCESS_TOKEN = "storageAccessToken";
   const METADATA = "metadata";
+  const CLIENT_METRICS = "clientMetrics";
+  const PREFETCH = "prefetch";
+  const REFRESH = "refresh";
 
   public static function getAllSubresources() {
     return array(SubResource::ACL,

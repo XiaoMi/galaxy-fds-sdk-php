@@ -16,6 +16,7 @@ final class Action {
   const DeleteBucket = "DeleteBucket";
   const ListObjects = "ListObjects";
   const PutObject = "PutObject";
+  const PostObject = "PostObject";
   const HeadObject = "HeadObject";
   const DeleteObject = "DeleteObject";
   const GetObject = "GetObject";

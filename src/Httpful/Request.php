@@ -870,8 +870,10 @@ class Request
 
         // If there are some additional curl opts that the user wants
         // to set, we can tack them in here
-        foreach ($this->additional_curl_opts as $curlopt => $curlval) {
-            curl_setopt($ch, $curlopt, $curlval);
+        if ($this->additional_curl_opts != null) {
+            foreach ($this->additional_curl_opts as $curlopt => $curlval) {
+                curl_setopt($ch, $curlopt, $curlval);
+            }
         }
 
         $this->_ch = $ch;

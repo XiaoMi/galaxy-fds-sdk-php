@@ -10,6 +10,7 @@ namespace FDS\Test;
 
 require_once(dirname(dirname(dirname(__FILE__))) . "/bootstrap.php");
 
+use FDS\auth\Common;
 use FDS\credential\BasicFDSCredential;
 use FDS\FDSClientConfiguration;
 use FDS\GalaxyFDSClient;
@@ -27,9 +28,10 @@ class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
 
   public static function setUpBeforeClass() {
     $fdsConfig = new FDSClientConfiguration();
+    $fdsConfig->setEnableMd5Calculate(true);
     $fdsConfig->enableUnitTestMode(true);
     $fdsConfig->setBaseUriforunittest("http://files.fds.api.xiaomi.com/");
-    self::$credential = new BasicFDSCredential("5341713837557", "kdHiBtkOnejXTuND86fiVw==");
+    self::$credential = new BasicFDSCredential("access_key", "access_secret");
     self::$fds_client = new GalaxyFDSClient(self::$credential, $fdsConfig);
     self::$bucket_name = "test-php-sdk-bucket-name";
   }
@@ -151,7 +153,7 @@ class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
 
     $metadata = new FDSObjectMetadata();
     $metadata->addUserMetadata("x-xiaomi-meta-" . "test", "test-metadata");
-    $metadata->setCacheControl("max-age=1234343");
+    $metadata->setCacheControl("max-age=86400");
     $metadata->setContentEncoding("abaaaaa");
     $metadata->setContentMD5("aaaaaaaaccccccc");
 
@@ -168,6 +170,25 @@ class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
     foreach ($raw_metadata as $key => $value) {
       $this->assertTrue(array_key_exists($key, $raw_object_metadata));
       $this->assertEquals($value, $raw_object_metadata[$key]);
+    }
+    $this->assertEquals(md5($content), $object_metadata->getContentMD5());
+  }
+
+  /**
+   * @depends testCreateBucket
+   */
+  public function testInvalidObjectMetadata() {
+    $metadata = new FDSObjectMetadata();
+
+    $metadata->addUserMetadata(
+        FDSObjectMetadata::USER_DEFINED_METADATA_PREFIX . "test", "test-value");
+    $metadata->addHeader(Common::CACHE_CONTROL, "no-cache");
+
+    try {
+      $metadata->addUserMetadata("test-meta-key", "test-meta-value");
+      $this->fail("Expected an exception to be thrown due to invalid metadata");
+    } catch (\Exception $e) {
+
     }
   }
 
@@ -269,6 +290,16 @@ class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
     foreach ($expected_common_prefixes as $prefix) {
       $this->assertEquals($prefix, $listing->getCommonPrefixes()[$index++]);
     }
+  }
+
+  public function testPresigedUri() {
+    $object_name = "中文测试";
+    $content = "presigned";
+    self::$fds_client->putObject(self::$bucket_name, $object_name, $content);
+    $uri = self::$fds_client->generatePresignedUri(self::$bucket_name,
+        $object_name, time() * 1000 + 60000);
+    $download = file_get_contents($uri);
+    $this->assertEquals($content, $download);
   }
 
   private function emptyBucket() {
