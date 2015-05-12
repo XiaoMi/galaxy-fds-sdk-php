@@ -10,8 +10,11 @@ namespace FDS;
 
 use FDS\auth\Common;
 use FDS\auth\signature\Signer;
+use FDS\metrics\MetricsCollector;
+use FDS\metrics\RequestMetrics;
 use FDS\model\AccessControlList;
 use FDS\model\AccessControlPolicy;
+use FDS\model\Action;
 use FDS\model\FDSBucket;
 use FDS\model\FDSObject;
 use FDS\model\FDSObjectListing;
@@ -19,9 +22,12 @@ use FDS\model\FDSObjectMetadata;
 use FDS\model\FDSObjectSummary;
 use FDS\model\Grant;
 use FDS\model\Grantee;
+use FDS\model\GrantType;
 use FDS\model\Owner;
+use FDS\model\Permission;
 use FDS\model\PutObjectResult;
 use FDS\model\SubResource;
+use FDS\model\UserGroups;
 use Httpful\Http;
 use Httpful\Mime;
 use Httpful\Request;
@@ -36,6 +42,7 @@ class GalaxyFDSClient implements GalaxyFDS {
 
   private $credential;
   private $fds_config;
+  private $metrics_collector;
   private $delimiter = "/";
 
   public function __construct($credential, $fds_config_or_base_uri = "") {
@@ -50,25 +57,25 @@ class GalaxyFDSClient implements GalaxyFDS {
 
       // Only considering the protocol used in fdsBaseUri, http(s), is enough
       // for compatibility.
-      if (0 == strpos($fds_config_or_base_uri, "http://")) {
+      if (0 === strpos($fds_config_or_base_uri, "http://")) {
         $this->fds_config->enableHttps(false);
       }
     } else {
       $this->fds_config = $fds_config_or_base_uri;
     }
-    $this->fds_config->setConnectionTimeoutSecs(
-      $this->fds_config->getDefaultConnectionTimeoutSecs());
+
+    if ($this->fds_config->isMetricsEnabled()) {
+      $this->metrics_collector = new MetricsCollector($this);
+      $this->metrics_collector->start();
+    }
   }
 
   public function listBuckets() {
     $uri = $this->formatUri($this->fds_config->getBaseUri(), "");
     $headers = $this->prepareRequestHeader($uri, Http::GET, NULL);
-    $response = Request::get($uri)
-      ->addHeaders($headers)
-      ->expects(Mime::JSON)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+
+    $response = $this->invoke(Action::ListBuckets, $uri, $headers, Http::GET,
+        Mime::JSON, null);
 
     if ($response->code == self::HTTP_OK) {
       $buckets = array();
@@ -92,11 +99,9 @@ class GalaxyFDSClient implements GalaxyFDS {
   public function createBucket($bucket_name) {
     $uri = $this->formatUri($this->fds_config->getBaseUri(), $bucket_name);
     $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
-    $response = Request::put($uri, "{}")
-      ->addHeaders($headers)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+
+    $response = $this->invoke(Action::PutBucket, $uri, $headers, Http::PUT,
+        null, "{}");
 
     if ($response->code != self::HTTP_OK) {
       $message = "Create bucket failed, status=" . $response->code .
@@ -110,11 +115,9 @@ class GalaxyFDSClient implements GalaxyFDS {
   public function deleteBucket($bucket_name) {
     $uri = $this->formatUri($this->fds_config->getBaseUri(), $bucket_name);
     $headers = $this->prepareRequestHeader($uri, Http::DELETE, NULL);
-    $response = Request::delete($uri)
-      ->addHeaders($headers)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+
+    $response = $this->invoke(Action::DeleteBucket, $uri, $headers,
+        Http::DELETE, null, null);
 
     if ($response->code != self::HTTP_OK) {
       $message = "Delete bucket failed, status=" . $response->code .
@@ -128,11 +131,9 @@ class GalaxyFDSClient implements GalaxyFDS {
   public function doesBucketExist($bucket_name) {
     $uri = $this->formatUri($this->fds_config->getBaseUri(), $bucket_name);
     $headers = $this->prepareRequestHeader($uri, Http::HEAD, NULL);
-    $response = Request::head($uri)
-      ->addHeaders($headers)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+
+    $response = $this->invoke(Action::HeadBucket, $uri, $headers, Http::HEAD,
+        null, null);
 
     if ($response->code == self::HTTP_OK) {
       return true;
@@ -151,12 +152,9 @@ class GalaxyFDSClient implements GalaxyFDS {
     $uri = $this->formatUri($this->fds_config->getBaseUri(), $bucket_name,
       SubResource::ACL);
     $headers = $this->prepareRequestHeader($uri, Http::GET, Mime::JSON);
-    $response = Request::get($uri)
-      ->expects(Mime::JSON)
-      ->addHeaders($headers)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+
+    $response = $this->invoke(Action::GetBucketACL, $uri, $headers, Http::GET,
+        Mime::JSON, null);
 
     if ($response->code == self::HTTP_OK) {
       $acp = AccessControlPolicy::fromJson($response->body);
@@ -173,11 +171,9 @@ class GalaxyFDSClient implements GalaxyFDS {
   public function setBucketAcl($bucket_name, $acl) {
     $uri = $this->formatUri($this->fds_config->getBaseUri(), $bucket_name, SubResource::ACL);
     $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
-    $response = Request::put($uri, json_encode($this->aclToAcp($acl)))
-      ->addHeaders($headers)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+
+    $response = $this->invoke(Action::PutBucketACL, $uri, $headers, Http::PUT,
+        null, json_encode($this->aclToAcp($acl)));
 
     if ($response->code != self::HTTP_OK) {
       $message = "Set bucket acl failed, status=" . $response->code .
@@ -192,12 +188,9 @@ class GalaxyFDSClient implements GalaxyFDS {
     $uri = $this->formatUri($this->fds_config->getBaseUri(), $bucket_name, "prefix=" . $prefix,
       "delimiter=" . $this->delimiter);
     $headers = $this->prepareRequestHeader($uri, Http::GET, Mime::JSON);
-    $response = Request::get($uri)
-      ->addHeaders($headers)
-      ->expects(Mime::JSON)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+
+    $response = $this->invoke(Action::ListObjects, $uri, $headers, Http::GET,
+        Mime::JSON, null);
 
     if ($response->code == self::HTTP_OK) {
       $listing = FDSObjectListing::fromJson($response->body);
@@ -224,12 +217,8 @@ class GalaxyFDSClient implements GalaxyFDS {
       "prefix=" . $prefix, "marker=" . $marker);
     $headers = $this->prepareRequestHeader($uri, Http::GET, Mime::JSON);
 
-    $response = Request::get($uri)
-      ->addHeaders($headers)
-      ->expects(Mime::JSON)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+    $response = $this->invoke(Action::ListObjects, $uri, $headers, Http::GET,
+        Mime::JSON, null);
 
     if ($response->code == self::HTTP_OK) {
       $listing = FDSObjectListing::fromJson($response->body);
@@ -247,14 +236,17 @@ class GalaxyFDSClient implements GalaxyFDS {
                             $metadata = NULL) {
     $uri = $this->formatUri($this->fds_config->getUploadBaseUri(),
         $bucket_name . "/" . $object_name);
+    if ($this->fds_config->isEnableMd5Calculate()) {
+      if ($metadata == NULL) {
+        $metadata = new FDSObjectMetadata();
+      }
+      $metadata->setContentMD5(md5($content));
+    }
     $header = $this->prepareRequestHeader($uri, Http::PUT,
       self::APPLICATION_OCTET_STREAM, $metadata);
 
-    $response = Request::put($uri, $content)
-      ->addHeaders($header)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+    $response = $this->invoke(Action::PutObject, $uri, $header, Http::PUT,
+        null, $content);
 
     if ($response->code == self::HTTP_OK) {
       $result = PutObjectResult::fromJson($response->body);
@@ -271,14 +263,17 @@ class GalaxyFDSClient implements GalaxyFDS {
   public function postObject($bucket_name, $content, $metadata = NULL) {
     $uri = $this->formatUri($this->fds_config->getUploadBaseUri(),
         $bucket_name . "/");
+    if ($this->fds_config->isEnableMd5Calculate()) {
+      if ($metadata == NULL) {
+        $metadata = new FDSObjectMetadata();
+      }
+      $metadata->setContentMD5(md5($content));
+    }
     $header = $this->prepareRequestHeader($uri, Http::POST,
       self::APPLICATION_OCTET_STREAM, $metadata);
 
-    $response = Request::post($uri, $content)
-      ->addHeaders($header)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+    $response = $this->invoke(Action::PostObject, $uri, $header, Http::POST,
+        null, $content);
 
     if ($response->code == self::HTTP_OK) {
       $result = PutObjectResult::fromJson($response->body);
@@ -296,12 +291,8 @@ class GalaxyFDSClient implements GalaxyFDS {
         $bucket_name . "/" . $object_name);
     $headers = $this->prepareRequestHeader($uri, Http::GET, NULL);
 
-    $response = Request::get($uri)
-      ->addHeaders($headers)
-      ->expects(self::APPLICATION_OCTET_STREAM)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+    $response = $this->invoke(Action::GetObject, $uri, $headers, Http::GET,
+        self::APPLICATION_OCTET_STREAM, null);
 
     if ($response->code == self::HTTP_OK) {
       $object = new FDSObject();
@@ -314,6 +305,14 @@ class GalaxyFDSClient implements GalaxyFDS {
       $object->setObjectSummary($summary);
       $object->setObjectMetadata($this->parseObjectMetadataFromHeaders(
         $response->headers->toArray()));
+
+      if ($this->fds_config->isDebugEnabled()) {
+        $length = strlen($object->getObjectContent());
+        if (!assert('$summary->getSize() == $length')) {
+          echo "Assertion failed: Object content length doesn't match,
+           expected:" . $summary->getSize() . ", actual:" . $length;
+        }
+      }
       return $object;
     } else {
       $message = "Get object failed, status=" . $response->code .
@@ -330,11 +329,8 @@ class GalaxyFDSClient implements GalaxyFDS {
       SubResource::METADATA);
     $headers = $this->prepareRequestHeader($uri, Http::GET, Mime::JSON);
 
-    $response = Request::get($uri)
-      ->addHeaders($headers)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+    $response = $this->invoke(Action::GetObjectMetadata, $uri, $headers,
+        Http::GET, null, null);
 
     if ($response->code == self::HTTP_OK) {
       $metadata = $this->parseObjectMetadataFromHeaders(
@@ -355,12 +351,8 @@ class GalaxyFDSClient implements GalaxyFDS {
       SubResource::ACL);
     $headers = $this->prepareRequestHeader($uri, Http::GET, Mime::JSON);
 
-    $response = Request::get($uri)
-      ->addHeaders($headers)
-      ->expects(Mime::JSON)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+    $response = $this->invoke(Action::GetObjectACL, $uri, $headers, Http::GET,
+        Mime::JSON, null);
 
     if ($response->code == self::HTTP_OK) {
       $acp = AccessControlPolicy::fromJson($response->body);
@@ -381,11 +373,8 @@ class GalaxyFDSClient implements GalaxyFDS {
       SubResource::ACL);
     $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
 
-    $response = Request::put($uri, json_encode($this->aclToAcp($acl)))
-      ->addHeaders($headers)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+    $response = $this->invoke(Action::PutObjectACL, $uri, $headers, Http::PUT,
+        null, json_encode($this->aclToAcp($acl)));
 
     if ($response->code != self::HTTP_OK) {
       $message = "Set object acl failed, status=" . $response->code .
@@ -401,11 +390,8 @@ class GalaxyFDSClient implements GalaxyFDS {
         $bucket_name . "/" . $object_name);
     $headers = $this->prepareRequestHeader($uri, Http::HEAD, Mime::JSON);
 
-    $response = Request::head($uri)
-      ->addHeaders($headers)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+    $response = $this->invoke(Action::HeadObject, $uri, $headers, Http::HEAD,
+        null, null);
 
     if ($response->code == self::HTTP_OK) {
       return true;
@@ -425,11 +411,8 @@ class GalaxyFDSClient implements GalaxyFDS {
         $bucket_name . "/" . $object_name);
     $headers = $this->prepareRequestHeader($uri, Http::DELETE, NULL);
 
-    $response = Request::delete($uri)
-      ->addHeaders($headers)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+    $response = $this->invoke(Action::DeleteObject, $uri, $headers,
+        Http::DELETE, null, null);
 
     if ($response->code != self::HTTP_OK) {
       $message = "Delete object failed, status=" . $response->code .
@@ -448,11 +431,8 @@ class GalaxyFDSClient implements GalaxyFDS {
     $headers = $this->prepareRequestHeader($uri, Http::PUT,
       self::APPLICATION_OCTET_STREAM);
 
-    $response = Request::put($uri)
-      ->addHeaders($headers)
-      ->retry($this->fds_config->getRetry())
-      ->timeout($this->fds_config->getConnectionTimeoutSecs())
-      ->send();
+    $response = $this->invoke(Action::RenameObject, $uri, $headers, Http::PUT,
+        null, null);
 
     if ($response->code != self::HTTP_OK) {
       $message = "Rename object failed, status=" . $response->code .
@@ -473,8 +453,17 @@ class GalaxyFDSClient implements GalaxyFDS {
       Common::EXPIRES . "=" . $expiration);
     $signature = Signer::signToBase64($http_method, $uri, NULL,
       $this->credential->getGalaxyAccessSecret(), self::SIGN_ALGORITHM);
-    $uri .= "&" . Common::SIGNATURE . "=" . $signature;
+    $uri = $this->formatUri($this->fds_config->getDownloadBaseUri(),
+      urlencode($bucket_name) . "/" . urlencode($object_name),
+      Common::GALAXY_ACCESS_KEY_ID . "=" . $this->credential->getGalaxyAccessId(),
+      Common::EXPIRES . "=" . $expiration,
+      Common::SIGNATURE . "=" . $signature);
     return $uri;
+  }
+
+  public function generateDownloadObjectUri($bucket_name, $object_name) {
+    return $this->formatUri($this->fds_config->getDownloadBaseUri(),
+      $bucket_name . "/" . $object_name);
   }
 
   public function getDelimiter() {
@@ -586,14 +575,12 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function getBucketQuota($bucket_name) {
-    $uri = $this->formatUri($bucket_name, SubResource::QUOTA);
+    $uri = $this->formatUri($this->fds_config->getBaseUri(), $bucket_name,
+        SubResource::QUOTA);
     $headers = $this->prepareRequestHeader($uri, Http::GET, Mime::JSON);
-    $response = Request::get($uri)
-        ->expects(Mime::JSON)
-        ->addHeaders($headers)
-        ->retry($this->fds_config->getRetry())
-        ->timeout($this->fds_config->getConnectionTimeoutSecs())
-        ->send();
+
+    $response = $this->invoke(Action::GetBucketQuota, $uri, $headers, Http::GET,
+        Mime::JSON, null);
 
     if ($response->code == self::HTTP_OK) {
       $policy = QuotaPolicy::fromJson($response->body);
@@ -608,13 +595,12 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function setBucketQuota($bucket_name, $quota) {
-    $uri = $this->formatUri($bucket_name, SubResource::QUOTA);
+    $uri = $this->formatUri($this->fds_config->getBaseUri(), $bucket_name,
+        SubResource::QUOTA);
     $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
-    $response = Request::put($uri, json_encode($quota))
-        ->addHeaders($headers)
-        ->retry($this->fds_config->getRetry())
-        ->timeout($this->fds_config->getConnectionTimeoutSecs())
-        ->send();
+
+    $response = $this->invoke(Action::PutBucketQuota, $uri, $headers, Http::PUT,
+        null, json_encode($quota));
 
     if ($response->code != self::HTTP_OK) {
       $message = "Set bucket quota failed, status=" . $response->code .
@@ -625,9 +611,118 @@ class GalaxyFDSClient implements GalaxyFDS {
     }
   }
 
+  public function putClientMetrics($clientMetrics) {
+    $uri = $this->formatUri($this->fds_config->getBaseUri(), "",
+        SubResource::CLIENT_METRICS);
+    $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
+
+    $response = Request::put($uri, json_encode($clientMetrics))
+        ->addHeaders($headers)
+        ->retry($this->fds_config->getRetry())
+        ->timeout($this->fds_config->getConnectionTimeoutSecs())
+        ->send();
+
+    if ($response->code != self::HTTP_OK) {
+      $message = "Put client metrics fialed, status=" . $response->code .
+          ", reason=" . $response->raw_body;
+      $this->printResponse($response);
+      throw new GalaxyFDSClientException($message);
+    }
+  }
+
+  public function prefetchObject($bucket_name, $object_name) {
+    $uri = $this->formatUri($this->fds_config->getBaseUri(),
+        $bucket_name . "/" . $object_name, SubResource::PREFETCH);
+    $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
+
+    $response = Request::put($uri, "")
+        ->addHeaders($headers)
+        ->retry($this->fds_config->getRetry())
+        ->timeout($this->fds_config->getConnectionTimeoutSecs())
+        ->send();
+
+    if ($response->code != self::HTTP_OK) {
+      $message = "Prefetch object failed, status=" . $response->code .
+          ", reason=" . $response->raw_body;
+      $this->printResponse($response);
+      throw new GalaxyFDSClientException($message);
+    }
+  }
+
+  public function refreshObject($bucket_name, $object_name) {
+    $uri = $this->formatUri($this->fds_config->getBaseUri(),
+        $bucket_name . "/" . $object_name, SubResource::REFRESH);
+    $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
+
+    $response = Request::put($uri, "")
+        ->addHeaders($headers)
+        ->retry($this->fds_config->getRetry())
+        ->timeout($this->fds_config->getConnectionTimeoutSecs())
+        ->send();
+
+    if ($response->code != self::HTTP_OK) {
+      $message = "Refresh object failed, status=" . $response->code .
+          ", reason=" . $response->raw_body;
+      $this->printResponse($response);
+      throw new GalaxyFDSClientException($message);
+    }
+  }
+
+  public function setPublic($bucket_name, $object_name, $disable_prefetch = false) {
+    $acl = new AccessControlList();
+    $grant = new Grant(new Grantee(UserGroups::ALL_USERS), Permission::READ);
+    $grant->setType(GrantType::GROUP);
+    $acl->addGrant($grant);
+    $this->setObjectAcl($bucket_name, $object_name, $acl);
+
+    if (!$disable_prefetch) {
+      $this->prefetchObject($bucket_name, $object_name);
+    }
+  }
+
   public function printResponse($response) {
     if ($this->fds_config->isDebugEnabled()) {
       print_r($response);
     }
+  }
+
+  private function invoke($action, $uri, $headers, $method, $expects, $payload) {
+    if ($this->fds_config->isMetricsEnabled()) {
+      $request_metrics = new RequestMetrics($action);
+      $request_metrics->startEvent(RequestMetrics::EXECUTION_TIME);
+    }
+
+    $request = null;
+    switch($method) {
+      case Http::GET:
+        $request = Request::get($uri);
+        break;
+      case Http::PUT:
+        $request = Request::put($uri, $payload);
+        break;
+      case Http::POST:
+        $request = Request::post($uri, $payload);
+        break;
+      case Http::DELETE:
+        $request = Request::delete($uri);
+        break;
+      case Http::HEAD:
+        $request = Request::head($uri);
+    }
+    if ($expects != null) {
+      $request = $request->expects($expects);
+    }
+
+    $response = $request->addHeaders($headers)
+        ->retry($this->fds_config->getRetry())
+        ->timeout($this->fds_config->getConnectionTimeoutSecs())
+        ->send();
+
+    if ($this->fds_config->isMetricsEnabled()) {
+      $request_metrics->endEvent(RequestMetrics::EXECUTION_TIME);
+      $this->metrics_collector->collect($request_metrics);
+    }
+
+    return $response;
   }
 }

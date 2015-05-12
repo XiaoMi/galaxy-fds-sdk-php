@@ -23,7 +23,9 @@ class FDSClientConfiguration {
   private $enable_https;
   private $enable_cdn_for_upload;
   private $enable_cdn_for_download;
+  private $enable_md5_calculate;
   private $enable_debug;
+  private $enable_metrics;
   private $retry;
   private $connection_timeout_secs;
 
@@ -35,10 +37,13 @@ class FDSClientConfiguration {
     $this->region_name = "";
     $this->enable_cdn_for_upload = false;
     $this->enable_cdn_for_download = true;
+    $this->enable_md5_calculate = false;
     $this->enable_debug = false;
+    $this->enable_metrics = false;
 
     $this->enable_unit_test_mode = false;
     $this->base_uri_for_unit_test = "";
+    $this->connection_timeout_secs = self::DEFAULT_CONNECTION_TIMEOUT_SECS;
   }
 
   public function getRegionName() {
@@ -71,6 +76,14 @@ class FDSClientConfiguration {
 
   public function enableCdnForDownload($enable_cdn_for_download) {
     $this->enable_cdn_for_download = $enable_cdn_for_download;
+  }
+
+  public function isEnableMd5Calculate() {
+    return $this->enable_md5_calculate;
+  }
+
+  public function setEnableMd5Calculate($enable_md5_calculate) {
+    $this->enable_md5_calculate = $enable_md5_calculate;
   }
 
   public function isEnabledUnitTestMode() {
@@ -139,6 +152,14 @@ class FDSClientConfiguration {
 
   public function enableDebug($enableDebug) {
     $this->enable_debug = $enableDebug;
+  }
+
+  public function isMetricsEnabled() {
+    return $this->enable_metrics;
+  }
+
+  public function enableMetrics($enableMetrics) {
+    $this->enable_metrics = $enableMetrics;
   }
 
   public function setRetry($retry) {

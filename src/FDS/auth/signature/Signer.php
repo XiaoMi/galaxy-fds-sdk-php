@@ -114,8 +114,10 @@ class Signer {
     $params = array();
     parse_str($query, $params);
     foreach ($params as $key => $value) {
-      if (array_search($key, self::$s_sub_resources) !== false) {
-        $sorted_params[$key] = $value;
+      if (self::$s_sub_resources != null) {
+        if (array_search($key, self::$s_sub_resources) !== false) {
+          $sorted_params[$key] = $value;
+        }
       }
     }
     ksort($sorted_params);

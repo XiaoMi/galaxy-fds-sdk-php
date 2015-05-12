@@ -224,6 +224,34 @@ interface GalaxyFDS {
                                $dst_object_name);
 
   /**
+   * Prefetch the object to CDN
+   *
+   * @param string $bucket_name The name of the bucket where the object stores
+   * @param string $object_name The name of the object
+   * @throws GalaxyFDSClientException
+   */
+  public function prefetchObject($bucket_name, $object_name);
+
+  /**
+   * Refresh the cache of the object in CDN
+   *
+   * @param string $bucket_name The name of the bucket where the object stores
+   * @param string $object_name The name of the object
+   * @throws GalaxyFDSClientException
+   */
+  public function refreshObject($bucket_name, $object_name);
+
+  /**
+   * Set the object public to all users
+   *
+   * @param string $bucket_name The name of the bucket where the object stores
+   * @param string $object_name The name of the object
+   * @param bool $disable_prefetch Indicates whether to prefetch to object to CDN
+   * @return mixed
+   */
+  public function setPublic($bucket_name, $object_name, $disable_prefetch = false);
+
+  /**
    * Returns a pre-signed URI for accessing Galaxy FDS resource.
    *
    * @param string $bucket_name The name of the bucket containing the desired object
@@ -238,4 +266,12 @@ interface GalaxyFDS {
    */
   public function generatePresignedUri($bucket_name, $object_name, $expiration,
                                        $http_method = "GET");
+
+  /**
+   * @param $bucket_name The name of the bucket containing the desired object
+   * @param $object_name The name of the desired object
+   * @returna A URI for downloading the desired object
+   * @throws GalaxyFDSClientException
+   */
+  public function generateDownloadObjectUri($bucket_name, $object_name);
 }

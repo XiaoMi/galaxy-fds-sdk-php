@@ -9,6 +9,7 @@
 namespace FDS\model;
 
 use FDS\auth\Common;
+use FDS\GalaxyFDSClientException;
 
 class FDSObjectMetadata {
 
@@ -22,15 +23,18 @@ class FDSObjectMetadata {
   private $metadata = array();
 
   public function addHeader($key, $value) {
+    $this->checkMetadata($key);
     $this->metadata[$key] = $value;
   }
 
   public function addUserMetadata($key, $value) {
+    $this->checkMetadata($key);
     $this->metadata[$key] = $value;
   }
 
   public function setUserMetadata($user_metadata) {
     foreach ($user_metadata as $key => $value) {
+      $this->checkMetadata($key);
       $this->metadata[$key] = $value;
     }
   }
@@ -103,5 +107,22 @@ class FDSObjectMetadata {
 
   public function getRawMetadata() {
     return $this->metadata;
+  }
+
+  private function checkMetadata($key) {
+    $is_valid = $this->startsWith($key, self::USER_DEFINED_METADATA_PREFIX);
+
+    if (!$is_valid) {
+      $is_valid = in_array($key, self::$PRE_DEFINED_METADATA);
+    }
+
+    if (!$is_valid) {
+      throw new GalaxyFDSClientException("Invalid metadata: " . $key);
+    }
+  }
+
+  private function startsWith($haystack, $needle) {
+    $len = strlen($needle);
+    return (substr($haystack, 0, $len) === $needle);
   }
 }
