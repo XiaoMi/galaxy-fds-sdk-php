@@ -27,6 +27,7 @@ class Request
     const SERIALIZE_PAYLOAD_SMART   = 2;
 
     const MAX_REDIRECTS_DEFAULT     = 25;
+    const DEFAULT_RETRY_NUMBER      = 1;
 
     public $uri,
            $method                  = Http::GET,
@@ -46,7 +47,8 @@ class Request
            $error_callback,
            $follow_redirects        = false,
            $max_redirects           = self::MAX_REDIRECTS_DEFAULT,
-           $payload_serializers     = array();
+           $payload_serializers     = array(),
+           $retry                   = self::DEFAULT_RETRY_NUMBER;
 
     // Options
     // private $_options = array(
@@ -152,7 +154,7 @@ class Request
     /**
      * Specify a HTTP timeout
      * @return Request $this
-     * @param |int $timeout seconds to timeout the HTTP call
+     * @param float|int $timeout seconds to timeout the HTTP call
      */
     public function timeout($timeout)
     {
@@ -164,6 +166,16 @@ class Request
     public function timeoutIn($seconds)
     {
         return $this->timeout($seconds);
+    }
+
+    /**
+     * Specify a retry number
+     * @param int $retry The retry number
+     * @return Request $this
+     */
+    public function retry($retry) {
+        $this->retry = $retry;
+        return $this;
     }
 
     /**
@@ -198,25 +210,43 @@ class Request
         if (!$this->hasBeenInitialized())
             $this->_curlPrep();
 
-        $result = curl_exec($this->_ch);
+        $result = false;
+        $retry_count = 0;
+        while ($result === false) {
+            $result = curl_exec($this->_ch);
 
-        if ($result === false) {
-            $this->_error(curl_error($this->_ch));
-            throw new ConnectionErrorException('Unable to connect: ' . curl_error($this->_ch));
+            if ($result === false) {
+                if ($retry_count < $this->retry) {
+                    $retry_count++;
+                } else {
+                    if ($curlErrorNumber = curl_errno($this->_ch)) {
+                        $curlErrorString = curl_error($this->_ch);
+                        $this->_error($curlErrorString);
+                        throw new ConnectionErrorException('Unable to connect: ' . $curlErrorNumber . ' ' . $curlErrorString);
+                    }
+
+                    $this->_error('Unable to connect.');
+                    throw new ConnectionErrorException('Unable to connect.');
+                }
+            }
         }
 
         $info = curl_getinfo($this->_ch);
 
-        //Remove the "HTTP/1.0 200 Connection established" string
-        if ($this->hasProxy() && false !== stripos($result, "HTTP/1.0 200 Connection established\r\n\r\n")) {
-            $result = str_ireplace("HTTP/1.0 200 Connection established\r\n\r\n", '', $result);
+        // Remove the "HTTP/1.x 200 Connection established" string and any other headers added by proxy
+        $proxy_regex = "/HTTP\/1\.[01] 200 Connection established.*?\r\n\r\n/s";
+        if ($this->hasProxy() && preg_match($proxy_regex, $result)) {
+            $result = preg_replace($proxy_regex, '', $result);
         }
+
         $response = explode("\r\n\r\n", $result, 2 + $info['redirect_count']);
 
         $body = array_pop($response);
         $headers = array_pop($response);
 
-        return new Response($body, $headers, $this);
+        curl_close($this->_ch);
+
+        return new Response($body, $headers, $this, $info);
     }
     public function sendIt()
     {
@@ -280,7 +310,8 @@ class Request
     /**
      * @return is this request setup for client side cert?
      */
-    public function hasClientSideCert() {
+    public function hasClientSideCert()
+    {
         return isset($this->client_cert) && isset($this->client_key);
     }
 
@@ -311,7 +342,8 @@ class Request
      * Set the body of the request
      * @return Request this
      * @param mixed $payload
-     * @param string $mimeType
+     * @param string $mimeType currently, sets the sends AND expects mime type although this
+     *    behavior may change in the next minor release (as it is a potential breaking change).
      */
     public function body($payload, $mimeType = null)
     {
@@ -333,7 +365,7 @@ class Request
     {
         if (empty($mime)) return $this;
         $this->content_type = $this->expected_type = Mime::getFullMime($mime);
-        if($this->isUpload()) {
+        if ($this->isUpload()) {
             $this->neverSerializePayload();
         }
         return $this;
@@ -378,11 +410,15 @@ class Request
         return $this->expects($mime);
     }
 
-    public function attach($files) {
+    public function attach($files)
+    {
         foreach ($files as $key => $file) {
-            $this->payload[$key] = "@{$file}";
+            if (function_exists('curl_file_create')) {
+                $this->payload[$key] = curl_file_create($file);
+            } else {
+                $this->payload[$key] = "@{$file}";
+            }
         }
-
         $this->sendsType(Mime::UPLOAD);
         return $this;
     }
@@ -395,7 +431,7 @@ class Request
     {
         if (empty($mime)) return $this;
         $this->content_type  = Mime::getFullMime($mime);
-        if($this->isUpload()) {
+        if ($this->isUpload()) {
             $this->neverSerializePayload();
         }
         return $this;
@@ -439,9 +475,11 @@ class Request
      * @param string $auth_username Authentication username. Default null
      * @param string $auth_password Authentication password. Default null
      */
-    public function useProxy($proxy_host, $proxy_port = 80, $auth_type = null, $auth_username = null, $auth_password = null){
+    public function useProxy($proxy_host, $proxy_port = 80, $auth_type = null, $auth_username = null, $auth_password = null, $proxy_type = Proxy::HTTP)
+    {
         $this->addOnCurlOption(CURLOPT_PROXY, "{$proxy_host}:{$proxy_port}");
-        if(in_array($auth_type, array(CURLAUTH_BASIC,CURLAUTH_NTLM)) ){
+        $this->addOnCurlOption(CURLOPT_PROXYTYPE, $proxy_type);
+        if (in_array($auth_type, array(CURLAUTH_BASIC,CURLAUTH_NTLM))) {
             $this->addOnCurlOption(CURLOPT_PROXYAUTH, $auth_type)
                 ->addOnCurlOption(CURLOPT_PROXYUSERPWD, "{$auth_username}:{$auth_password}");
         }
@@ -449,9 +487,30 @@ class Request
     }
 
     /**
+     * Shortcut for useProxy to configure SOCKS 4 proxy
+     * @see Request::useProxy
+     * @return Request
+     */
+    public function useSocks4Proxy($proxy_host, $proxy_port = 80, $auth_type = null, $auth_username = null, $auth_password = null)
+    {
+        return $this->useProxy($proxy_host, $proxy_port, $auth_type, $auth_username, $auth_password, Proxy::SOCKS4);
+    }
+
+    /**
+     * Shortcut for useProxy to configure SOCKS 5 proxy
+     * @see Request::useProxy
+     * @return Request
+     */
+    public function useSocks5Proxy($proxy_host, $proxy_port = 80, $auth_type = null, $auth_username = null, $auth_password = null)
+    {
+        return $this->useProxy($proxy_host, $proxy_port, $auth_type, $auth_username, $auth_password, Proxy::SOCKS5);
+    }
+
+    /**
      * @return is this request setup for using proxy?
      */
-    public function hasProxy(){
+    public function hasProxy()
+    {
         return isset($this->additional_curl_opts[CURLOPT_PROXY]) && is_string($this->additional_curl_opts[CURLOPT_PROXY]);
     }
 
@@ -531,7 +590,7 @@ class Request
      * here just as a convenience in very specific cases.
      * The preferred "readable" way would be to leverage
      * the support for custom header methods.
-     * @return Response $this
+     * @return Request $this
      * @param array $headers
      */
     public function addHeaders(array $headers)
@@ -596,6 +655,18 @@ class Request
     }
 
     /**
+     * Callback called to handle HTTP errors. When nothing is set, defaults
+     * to logging via `error_log`
+     * @return Request
+     * @param \Closure $callback (string $error)
+     */
+    public function whenError(\Closure $callback)
+    {
+        $this->error_callback = $callback;
+        return $this;
+    }
+
+    /**
      * Register a callback that will be used to serialize the payload
      * for a particular mime type.  When using "*" for the mime
      * type, it will use that parser for all responses regardless of the mime
@@ -620,7 +691,7 @@ class Request
      */
     public function serializePayloadWith(\Closure $callback)
     {
-        return $this->regregisterPayloadSerializer('*', $callback);
+        return $this->registerPayloadSerializer('*', $callback);
     }
 
     /**
@@ -726,9 +797,13 @@ class Request
 
     private function _error($error)
     {
-        // Default actions write to error log
-        // TODO add in support for various Loggers
-        error_log($error);
+        // TODO add in support for various Loggers that follow
+        // PSR 3 https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-3-logger-interface.md
+        if (isset($this->error_callback)) {
+            $this->error_callback->__invoke($error);
+        } else {
+            error_log($error);
+        }
     }
 
     /**
@@ -793,12 +868,14 @@ class Request
             curl_setopt($ch, CURLOPT_SSLKEY,        $this->client_key);
             curl_setopt($ch, CURLOPT_SSLKEYPASSWD,  $this->client_passphrase);
             // curl_setopt($ch, CURLOPT_SSLCERTPASSWD,  $this->client_cert_passphrase);
-        } else {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);
         }
 
         if ($this->hasTimeout()) {
-            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+            if (defined('CURLOPT_TIMEOUT_MS')) {
+                curl_setopt($ch, CURLOPT_TIMEOUT_MS, $this->timeout * 1000);
+            } else {
+                curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+            }
         }
 
         if ($this->follow_redirects) {
@@ -807,6 +884,11 @@ class Request
         }
 
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $this->strict_ssl);
+        // zero is safe for all curl versions
+        $verifyValue = $this->strict_ssl + 0;
+        //Support for value 1 removed in cURL 7.28.1 value 2 valid in all versions
+        if ($verifyValue > 0) $verifyValue++;
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $verifyValue);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
         // https://github.com/nategood/httpful/issues/84
@@ -814,7 +896,7 @@ class Request
         if (isset($this->payload)) {
             $this->serialized_payload = $this->_serializePayload($this->payload);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $this->serialized_payload);
-            if(!$this->isUpload()) {
+            if (!$this->isUpload()) {
                 $this->headers['Content-Length'] =
                     $this->_determineLength($this->serialized_payload);
             }
