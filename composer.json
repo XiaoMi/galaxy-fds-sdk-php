@@ -1,0 +1,19 @@
+{
+  "name": "xiaomi/galaxy-fds-sdk-php",
+  "description": "Xiaomi File Data Storage PHP SDK",
+  "keywords": [
+    "xiaomi",
+    "fds",
+    "api",
+    "sdk"
+  ],
+  "version": "0.1",
+  "license": "Apache",
+  "autoload": {
+    "classmap": ["."]
+  },
+  "require": {
+    "php": ">=5.3",
+    "symfony/class-loader": "2.5.5"
+  }
+}
