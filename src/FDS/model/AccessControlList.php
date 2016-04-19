@@ -20,6 +20,16 @@ abstract class Permission {
   // object in the bucket; it is not applicable for objects.
   const WRITE = 0x02;
 
+  // The READ_OBJECT permission: when it applies to buckets it means
+  // allow the grantee to read any object in the bucket;
+  // it is not applicable to object.
+  const READ_OBJECTS = 0x04;
+
+  // The SSO_WRITE permission: when applied to bucket, it means
+  // users can put objects to the bucket with SSO auth.
+  // it is not applicable to object.
+  const SSO_WRITE = 0x08;
+
   // The FULL_CONTROL permission: allows the grantee the READ
   // and WRITE permission on the bucket/object.
   const FULL_CONTROL = 0xff;
@@ -30,6 +40,10 @@ abstract class Permission {
         return "READ";
       case self::WRITE:
         return "WRITE";
+      case self::READ_OBJECTS:
+        return "READ_OBJECTS";
+      case self::SSO_WRITE:
+        return "SSO_WRITE";
       case self::FULL_CONTROL:
         return "FULL_CONTROL";
       default:
@@ -42,6 +56,10 @@ abstract class Permission {
       return self::READ;
     } elseif ($permission == "WRITE") {
       return self::WRITE;
+    } else if ($permission == "READ_OBJECTS") {
+      return self::READ_OBJECTS;
+    } else if ($permission == "SSO_WRITE") {
+      return self::SSO_WRITE;
     } elseif ($permission == "FULL_CONTROL") {
       return self::FULL_CONTROL;
     }

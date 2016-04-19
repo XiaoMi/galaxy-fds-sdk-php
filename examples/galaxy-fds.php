@@ -49,3 +49,4 @@ $fds_client->deleteBucket($bucket_name);
 // Check bucket existence
 $exist = $fds_client->doesBucketExist($bucket_name);
 assert(!$exist);
+

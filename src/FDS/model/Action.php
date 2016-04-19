@@ -19,6 +19,8 @@ final class Action {
   const PostObject = "PostObject";
   const HeadObject = "HeadObject";
   const DeleteObject = "DeleteObject";
+  const DeleteObjects = "DeleteObjects";
+  const RestoreObject = "RestoreObject";
   const GetObject = "GetObject";
   const GetBucketACL = "GetBucketACL";
   const PutBucketACL = "PutBucketACL";
@@ -29,5 +31,9 @@ final class Action {
   const RenameObject = "RenameObject";
   const GetMetrics = "GetMetrics";
   const GetObjectMetadata = "GetObjectMetadata";
+  const InitMultipartUpload = "InitMultipartUpload";
+  const UploadPart = "UploadPart";
+  const CompleteMultipartUpload = "CompleteMultipartUpload";
+  const AbortMultipartUpload = "AbortMultipartUpload";
   const Unknown = "Unknown";
 }
