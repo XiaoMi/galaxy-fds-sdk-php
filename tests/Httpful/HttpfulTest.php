@@ -17,11 +17,14 @@ use Httpful\Request;
 use Httpful\Mime;
 use Httpful\Http;
 use Httpful\Response;
+use Httpful\Handlers\JsonHandler;
+
+define('TEST_SERVER', WEB_SERVER_HOST . ':' . WEB_SERVER_PORT);
 
 class HttpfulTest extends \PHPUnit_Framework_TestCase
 {
-    const TEST_SERVER = '127.0.0.1:8008';
-    const TEST_URL = 'http://127.0.0.1:8008';
+    const TEST_SERVER = TEST_SERVER;
+    const TEST_URL = '127.0.0.1:8008';
     const TEST_URL_400 = 'http://127.0.0.1:8008/400';
 
     const SAMPLE_JSON_HEADER =
@@ -321,9 +324,15 @@ Content-Type: text/plain; charset=utf-8\r\n", $req);
         $req = Request::init();
 
         $req->attach(array('index' => '/dir/filename'));
-        // $response = new Response(SAMPLE_JSON_RESPONSE, "", $req);
-        // // Check default content type of iso-8859-1
-        $this->assertEquals($req->payload['index'], '@/dir/filename');
+        $payload = $req->payload['index'];
+        // PHP 5.5  + will take advantage of CURLFile while previous
+        // versions just use the string syntax
+        if (is_string($payload)) {
+            $this->assertEquals($payload, '@/dir/filename');
+        } else {
+            $this->assertInstanceOf('CURLFile', $payload);
+        }
+
         $this->assertEquals($req->content_type, Mime::UPLOAD);
         $this->assertEquals($req->serialize_payload_method, Request::SERIALIZE_PAYLOAD_NEVER);
     }
@@ -384,6 +393,21 @@ Content-Type: text/plain; charset=utf-8\r\n", $req);
         $this->assertTrue($response->hasErrors());
         $response = new Response('', "HTTP/1.1 500 Internal Server Error\r\n", $req);
         $this->assertTrue($response->hasErrors());
+    }
+
+    function testWhenError() {
+        $caught = false;
+
+        try {
+            Request::get('malformed:url')
+                ->whenError(function($error) use(&$caught) {
+                    $caught = true;
+                })
+                ->timeoutIn(0.1)
+                ->send();
+        } catch (\Httpful\Exception\ConnectionErrorException $e) {}
+
+        $this->assertTrue($caught);
     }
 
     function test_parseCode()
@@ -491,20 +515,63 @@ Transfer-Encoding: chunked\r\n", $request);
         $this->assertNotEquals($prev, $new);
     }
 
-    public function testHasProxyWithoutProxy() {
+    public function testHasProxyWithoutProxy()
+    {
         $r = Request::get('someUrl');
         $this->assertFalse($r->hasProxy());
     }
 
-    public function testHasProxyWithProxy() {
+    public function testHasProxyWithProxy()
+    {
         $r = Request::get('some_other_url');
         $r->useProxy('proxy.com');
         $this->assertTrue($r->hasProxy());
     }
+
+    public function testParseJSON()
+    {
+        $handler = new JsonHandler();
+
+        $bodies = array(
+            'foo',
+            array(),
+            array('foo', 'bar'),
+            null
+        );
+        foreach ($bodies as $body) {
+            $this->assertEquals($body, $handler->parse(json_encode($body)));
+        }
+
+        try {
+            $result = $handler->parse('invalid{json');
+        } catch(\Exception $e) {
+            $this->assertEquals('Unable to parse response as JSON', $e->getMessage());
+            return;
+        }
+        $this->fail('Expected an exception to be thrown due to invalid json');
+    }
+
+    // /**
+    //  * Skeleton for testing against the 5.4 baked in server
+    //  */
+    // public function testLocalServer()
+    // {
+    //     if (!defined('WITHOUT_SERVER') || (defined('WITHOUT_SERVER') && !WITHOUT_SERVER)) {
+    //         // PHP test server seems to always set content type to application/octet-stream
+    //         // so force parsing as JSON here
+    //         Httpful::register('application/octet-stream', new \Httpful\Handlers\JsonHandler());
+    //         $response = Request::get(TEST_SERVER . '/test.json')
+    //             ->sendsAndExpects(MIME::JSON);
+    //         $response->send();
+    //         $this->assertTrue(...);
+    //     }
+    // }
 }
 
-class DemoMimeHandler extends \Httpful\Handlers\MimeHandlerAdapter {
-    public function parse($body) {
+class DemoMimeHandler extends \Httpful\Handlers\MimeHandlerAdapter
+{
+    public function parse($body)
+    {
         return 'custom parse';
     }
 }

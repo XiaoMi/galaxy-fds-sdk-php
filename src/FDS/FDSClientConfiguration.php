@@ -18,6 +18,7 @@ class FDSClientConfiguration {
   const URI_FDS_SSL_SUFFIX = ".fds-ssl.api.xiaomi.com/";
   const DEFAULT_RETRY_NUM = 3;
   const DEFAULT_CONNECTION_TIMEOUT_SECS = 30;
+  const DEFAULT_MAX_BATCH_DELETE_SIZE = 100;
 
   private $region_name;
   private $enable_https;
@@ -28,6 +29,7 @@ class FDSClientConfiguration {
   private $enable_metrics;
   private $retry;
   private $connection_timeout_secs;
+  private $batch_delete_size;
 
   private $enable_unit_test_mode;
   private $base_uri_for_unit_test;
@@ -44,6 +46,7 @@ class FDSClientConfiguration {
     $this->enable_unit_test_mode = false;
     $this->base_uri_for_unit_test = "";
     $this->connection_timeout_secs = self::DEFAULT_CONNECTION_TIMEOUT_SECS;
+    $this->batch_delete_size = self::DEFAULT_MAX_BATCH_DELETE_SIZE;
   }
 
   public function getRegionName() {
@@ -178,7 +181,16 @@ class FDSClientConfiguration {
     return $this->connection_timeout_secs;
   }
 
-  public function  getDefaultConnectionTimeoutSecs() {
+  public function getDefaultConnectionTimeoutSecs() {
     return self::DEFAULT_CONNECTION_TIMEOUT_SECS;
+  }
+
+  public function getBatchDeleteSize() {
+    return $this->batch_delete_size;
+  }
+
+  public function setBatchDeleteSize($size) {
+    $this->batch_delete_size = min($size, SELF::DEFAULT_MAX_BATCH_DELETE_SIZE);
+    $this->batch_delete_size = max(1, $this->batch_delete_size);
   }
 }
