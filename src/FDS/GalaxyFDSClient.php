@@ -23,10 +23,12 @@ use FDS\model\FDSObjectSummary;
 use FDS\model\Grant;
 use FDS\model\Grantee;
 use FDS\model\GrantType;
+use FDS\model\InitMultipartUploadResult;
 use FDS\model\Owner;
 use FDS\model\Permission;
 use FDS\model\PutObjectResult;
 use FDS\model\SubResource;
+use FDS\model\UploadPartResult;
 use FDS\model\UserGroups;
 use Httpful\Http;
 use Httpful\Mime;
@@ -204,6 +206,10 @@ class GalaxyFDSClient implements GalaxyFDS {
     }
   }
 
+  public function listTrashObjects($prefix = "") {
+    return $this->listObjects("trash", $prefix);
+  }
+
   public function listNextBatchOfObjects($previous_object_listing) {
     if (!$previous_object_listing->isTruncated()) {
       // TODO(wuzesheng) Log a warning message
@@ -212,9 +218,10 @@ class GalaxyFDSClient implements GalaxyFDS {
 
     $bucket_name = $previous_object_listing->getBucketName();
     $prefix = $previous_object_listing->getPrefix();
+    $delimiter = $previous_object_listing->getDelimiter();
     $marker = $previous_object_listing->getNextMarker();
     $uri = $this->formatUri($this->fds_config->getBaseUri(), $bucket_name,
-      "prefix=" . $prefix, "marker=" . $marker);
+      "prefix=" . $prefix, "delimiter=" . $delimiter, "marker=" . $marker);
     $headers = $this->prepareRequestHeader($uri, Http::GET, Mime::JSON);
 
     $response = $this->invoke(Action::ListObjects, $uri, $headers, Http::GET,
@@ -423,6 +430,97 @@ class GalaxyFDSClient implements GalaxyFDS {
     }
   }
 
+  public function deleteObjects($bucket_name, $object_name_list) {
+    $batch_deletion_size = $this->fds_config->getBatchDeleteSize();
+    if (count($object_name_list) > $batch_deletion_size) {
+      throw new GalaxyFDSClientException("length of \$object_name_list("
+          . strval(count($object_name_list))
+          . ") exceeds limit(" . strval($batch_deletion_size) . ")");
+    }
+
+    $uri = $this->formatUri($this->fds_config->getBaseUri(),
+        $bucket_name, "deleteObjects=");
+
+    $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
+
+    $response = $this->invoke(Action::DeleteObjects, $uri, $headers,
+        Http::PUT, null, json_encode($object_name_list));
+
+    if ($response->code != self::HTTP_OK) {
+      $message = "Delete objects failed, status=" . $response->code .
+          ", bucket_name=" . $bucket_name .
+          ", object_name_list=" . serialize($object_name_list) .
+          ", reason=" . $response;
+      $this->printResponse($response);
+      throw new GalaxyFDSClientException($message);
+    }
+
+    return json_decode($response->raw_body);
+  }
+
+  private function objectSummaries2ObjectNames($object_summaries) {
+    $object_names = array();
+    foreach ($object_summaries as $object_summary) {
+      array_push($object_names, $object_summary->getObjectName());
+    }
+    return $object_names;
+  }
+
+  public function deleteObjectsByPrefix($bucket_name, $object_name_prefix) {
+    $result_list = array();
+    $old_delimiter = self::getDelimiter();
+    $batch_deletion_size = $this->fds_config->getBatchDeleteSize();
+    try {
+      self::setDelimiter("");
+      // list object_name list in bucket
+      $object_listing = self::listObjects($bucket_name, $object_name_prefix);
+      while ($object_listing !== NULL) {
+        $object_name_list =self::objectSummaries2ObjectNames($object_listing->getObjectSummaries());
+        $object_2_delete_array = array_chunk($object_name_list, $batch_deletion_size);
+
+        foreach ($object_2_delete_array as $object_2_delete) {
+          try {
+            $tmp_result_list = self::deleteObjects($bucket_name, $object_2_delete);
+            $result_list = array_merge($result_list, $tmp_result_list);
+          } catch (\Exception $e) {
+            usleep(500*1000);
+            // retry with smaller chunk
+            $small_object_name_array = array_chunk($object_2_delete, max($batch_deletion_size / 10, 10));
+            foreach ($small_object_name_array as $object_list) {
+              $tmp_result_list = self::deleteObjects($bucket_name, $object_list);
+              $result_list = array_merge($result_list, $tmp_result_list);
+            }
+          }
+        }
+        // get next object_name list
+        $object_listing = self::listNextBatchOfObjects($object_listing);
+      }
+    } finally {
+      self::setDelimiter($old_delimiter);
+    }
+
+    return $result_list;
+  }
+
+  public function restoreObject($bucket_name, $object_name) {
+    $uri = $this->formatUri($this->fds_config->getBaseUri(),
+        $bucket_name . "/" . $object_name, "restore");
+    $headers = $this->prepareRequestHeader($uri, Http::PUT,
+      self::APPLICATION_OCTET_STREAM);
+
+    $response = $this->invoke(Action::RestoreObject, $uri, $headers, Http::PUT,
+        null, null);
+
+    if ($response->code != self::HTTP_OK) {
+      $message = "Restore object failed, status=" . $response->code .
+        ", bucket_name=" . $bucket_name .
+        ", object_name=" . $object_name .
+        ", reason=" . $response->raw_body;
+      $this->printResponse($response);
+      throw new GalaxyFDSClientException($message);
+    }
+  }
+
   public function renameObject($bucket_name, $src_object_name,
                                $dst_object_name) {
     $uri = $this->formatUri($this->fds_config->getBaseUri(),
@@ -446,24 +544,37 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function generatePresignedUri($bucket_name, $object_name, $expiration,
-                                       $http_method = "GET") {
-    $uri = $this->formatUri($this->fds_config->getDownloadBaseUri(),
+                                       $http_method = "GET", $content_type = null) {
+    $base_uri = $this->fds_config->getDownloadBaseUri();
+    if ($http_method === "PUT" or $http_method === "POST") {
+      $base_uri = $this->fds_config->getUploadBaseUri();
+    } else if($http_method === "DELETE") {
+      $base_uri = $this->fds_config->getBaseUri();
+    }
+
+    $uri = $this->formatUri($base_uri,
       $bucket_name . "/" . $object_name,
       Common::GALAXY_ACCESS_KEY_ID . "=" . $this->credential->getGalaxyAccessId(),
       Common::EXPIRES . "=" . $expiration);
-    $signature = Signer::signToBase64($http_method, $uri, NULL,
+    $headers = NULL;
+    if (is_string($content_type)) {
+      $headers = array();
+      $headers[common::CONTENT_TYPE] = $content_type;
+    }
+    $signature = Signer::signToBase64($http_method, $uri, $headers,
       $this->credential->getGalaxyAccessSecret(), self::SIGN_ALGORITHM);
-    $uri = $this->formatUri($this->fds_config->getDownloadBaseUri(),
-      urlencode($bucket_name) . "/" . urlencode($object_name),
-      Common::GALAXY_ACCESS_KEY_ID . "=" . $this->credential->getGalaxyAccessId(),
-      Common::EXPIRES . "=" . $expiration,
-      Common::SIGNATURE . "=" . $signature);
+
+    $uri = $this->formatUri($base_uri,
+        urlencode($bucket_name) . "/" . urlencode($object_name),
+        Common::GALAXY_ACCESS_KEY_ID . "=" . $this->credential->getGalaxyAccessId(),
+        Common::EXPIRES . "=" . $expiration,
+        Common::SIGNATURE . "=" . $signature);
     return $uri;
   }
 
   public function generateDownloadObjectUri($bucket_name, $object_name) {
-    return $this->formatUri($this->fds_config->getDownloadBaseUri(),
-      $bucket_name . "/" . $object_name);
+     return $this->formatUri($this->fds_config->getDownloadBaseUri(),
+        $bucket_name . "/" . $object_name);
   }
 
   public function getDelimiter() {
@@ -668,15 +779,87 @@ class GalaxyFDSClient implements GalaxyFDS {
     }
   }
 
-  public function setPublic($bucket_name, $object_name, $disable_prefetch = false) {
+  public function setPublic($bucket_name, $object_name) {
     $acl = new AccessControlList();
     $grant = new Grant(new Grantee(UserGroups::ALL_USERS), Permission::READ);
     $grant->setType(GrantType::GROUP);
     $acl->addGrant($grant);
     $this->setObjectAcl($bucket_name, $object_name, $acl);
+  }
 
-    if (!$disable_prefetch) {
-      $this->prefetchObject($bucket_name, $object_name);
+  public function initMultipartUpload($bucket_name, $object_name) {
+    $uri = $this->formatUri($this->fds_config->getBaseUri(),
+        $bucket_name . "/" . $object_name, SubResource::UPLOADS);
+    $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
+
+    $response = $this->invoke(Action::InitMultipartUpload, $uri, $headers, Http::PUT,
+        null, null);
+
+    if ($response->code == self::HTTP_OK) {
+      $result = InitMultipartUploadResult::fromJson($response->body);
+      return $result;
+    } else {
+      $message = "Init multipart upload failed, status=" . $response->code .
+          ", reason=" . $response->raw_body;
+      $this->printResponse($response);
+      throw new GalaxyFDSClientException($message);
+    }
+  }
+
+  public function uploadPart($bucket_name, $object_name, $upload_id,
+      $part_number, $content) {
+    $uri = $this->fds_config->getBaseUri() . $bucket_name . "/" . $object_name .
+        "?uploadId=" . $upload_id . "&partNumber=" . $part_number;
+    $headers = $this->prepareRequestHeader($uri, Http::PUT,
+        self::APPLICATION_OCTET_STREAM);
+
+    $response = $this->invoke(Action::UploadPart, $uri, $headers, Http::PUT,
+        null, $content);
+
+    if ($response->code == self::HTTP_OK) {
+      $result = UploadPartResult::fromJson($response->body);
+      return $result;
+    } else {
+      $message = "Upload part failed, status=" . $response->code .
+          ", reason=" . $response->raw_body;
+      $this->printResponse($response);
+      throw new GalaxyFDSClientException($message);
+    }
+  }
+
+  public function completeMultipartUpload($bucket_name, $object_name,
+      $upload_id, $metadata, $upload_part_result_list) {
+    $uri = $this->fds_config->getBaseUri() . $bucket_name . "/" . $object_name .
+        "?uploadId=" . $upload_id;
+    $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
+
+    $response = $this->invoke(Action::CompleteMultipartUpload, $uri, $headers,
+        Http::PUT, null, json_encode($upload_part_result_list));
+
+    if ($response->code == self::HTTP_OK) {
+      $result = PutObjectResult::fromJson($response->body);
+      return $result;
+    } else {
+      $message = "Complete multipart failed, status=" . $response->code .
+          ", reason=" . $response->raw_body;
+      $this->printResponse($response);
+      throw new GalaxyFDSClientException($message);
+    }
+  }
+
+  public function abortMultipartUpload($bucket_name, $object_name, $upload_id) {
+    $uri = $this->fds_config->getBaseUri() . $bucket_name . "/" . $object_name .
+        "?uploadId=" + $upload_id;
+    $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
+
+    $response = $this->invoke(Action::AbortMultipartUpload, $uri, $headers,
+        Http::PUT, null, null);
+
+    if ($response->code != self::HTTP_OK) {
+      $message = "Abort multipart failed, status=" . $response->code .
+          ", reason=" . $response->raw_body;
+      $this->printResponse($response);
+      throw new GalaxyFDSClientException($message);
     }
   }
 
