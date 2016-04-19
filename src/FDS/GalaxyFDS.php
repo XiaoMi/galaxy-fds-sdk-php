@@ -109,6 +109,14 @@ interface GalaxyFDS {
   public function listObjects($bucket_name, $prefix = "");
 
   /**
+   * Compared with listObjects, it return a list of objects in the trash.
+   * @param string $prefix A prefix of bucket_name/object_name.
+   * @return FDSObjectListing A listing of the objects in the trash.
+   * @throws GalaxyFDSClientException
+   */
+  public function listTrashObjects($prefix = "");
+
+  /**
    * Provides an easy way to continue a truncated object listing and retrieve
    * the next page of results.
    *
@@ -213,6 +221,50 @@ interface GalaxyFDS {
   public function deleteObject($bucket_name, $object_name);
 
   /**
+   * Deletes objects with the specified name.
+   *
+   * @param string $bucket_name The name of the bucket
+   * @param $object_name_list array of names to delete, count($object_name_list)
+   *        should less than 100
+   * @return array of failure reason:
+   * (...,
+   *   (
+   *     "object_name" => "$OBJECT_NAME",
+   *     "error_code" => $ERROR_CODE,
+   *     "error_description" => "$ERROR_MESSAGE"
+   *   ),
+   * ...
+   * )
+   */
+  public function deleteObjects($bucket_name, $object_name_list);
+
+  /**
+   * Deletes objects with the specified name.
+   *
+   * @param string $bucket_name The name of the bucket
+   * @param $object_name_prefix array of names to delete
+   * @return
+   * (...,
+   *   (
+   *     "object_name" => $OBJECT_NAME,
+   *     "error_code" => $ERROR_CODE,
+   *     "error_description" => $ERROR_MESSAGE
+   *   ),
+   * ...
+   * )
+   */
+   public function deleteObjectsByPrefix($bucket_name, $object_name_prefix);
+
+  /**
+   * Restores the object in the trash.
+   *
+   * @param $bucket_name The name of the bucket where the objects stores.
+   * @param $object_name The name of the object to restore
+   * @throws GalaxyFDSClientException
+   */
+  public function restoreObject($bucket_name, $object_name);
+
+  /**
    * Renames the object with the specified name under the specified bucket.
    *
    * @param string $bucket_name The name of the bucket where the object stores
@@ -246,26 +298,62 @@ interface GalaxyFDS {
    *
    * @param string $bucket_name The name of the bucket where the object stores
    * @param string $object_name The name of the object
-   * @param bool $disable_prefetch Indicates whether to prefetch to object to CDN
    * @return mixed
    */
-  public function setPublic($bucket_name, $object_name, $disable_prefetch = false);
+  public function setPublic($bucket_name, $object_name);
+
+  /** Init a multipart upload session
+   * @param $bucket_name
+   * @param $object_name
+   * @return mixed
+   */
+  public function initMultipartUpload($bucket_name, $object_name);
+
+  /** Upload a part
+   * @param $bucket_name
+   * @param $object_name
+   * @param $upload_id
+   * @param $part_number
+   * @param $content
+   * @return mixed
+   */
+  public function uploadPart($bucket_name, $object_name, $upload_id,
+      $part_number, $content);
+
+  /** Complete the multipart upload
+   * @param $bucket_name
+   * @param $object_name
+   * @param $upload_id
+   * @param $metadata
+   * @param $upload_part_result_list
+   * @return mixed
+   */
+  public function completeMultipartUpload($bucket_name, $object_name,
+      $upload_id, $metadata, $upload_part_result_list);
+
+  /** Abort the multipart upload
+   * @param $bucket_name
+   * @param $object_name
+   * @param $upload_id
+   * @return mixed
+   */
+  public function abortMultipartUpload($bucket_name, $object_name, $upload_id);
 
   /**
    * Returns a pre-signed URI for accessing Galaxy FDS resource.
    *
-   * @param string $bucket_name The name of the bucket containing the desired object
-   * @param string $object_name The name of the desired object
-   * @param long $expiration  The time at which the returned pre-signed URL will expire
-   * @param string $http_method The HTTP method verb to use for this URL
+   * @param string $bucket_name  The name of the bucket containing the desired object
+   * @param string $object_name  The name of the desired object
+   * @param long $expiration     The time at which the returned pre-signed URL will expire
+   * @param string $http_method  The HTTP method verb to use for this URL
+   * @param string $content_type The content-type of object, used when method is PUT
    * @return string A pre-signed URL which expires at the specified time, and can
    *                be used to allow anyone to access the specified object from
-   *                galaxy fds, without exposing the owner's Galaxy secret access
-   *                key.
-   * @throws GalaxyFDSClientException
+   * galaxy fds, without exposing the owner's Galaxy secret access
+   * key.
    */
   public function generatePresignedUri($bucket_name, $object_name, $expiration,
-                                       $http_method = "GET");
+                                       $http_method = "GET", $content_type = NULL);
 
   /**
    * @param $bucket_name The name of the bucket containing the desired object

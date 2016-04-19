@@ -19,6 +19,7 @@ use FDS\model\FDSObjectMetadata;
 use FDS\model\Grant;
 use FDS\model\Grantee;
 use FDS\model\Permission;
+use Httpful\Request;
 
 class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
 
@@ -37,17 +38,13 @@ class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
   }
 
   public static function tearDownAfterClass() {
-    self::$fds_client->setDelimiter("");
-    $listing = self::$fds_client->listObjects(self::$bucket_name);
-    foreach ($listing->getObjectSummaries() as $summary) {
-      $object = $summary->getObjectName();
-      self::$fds_client->deleteObject(self::$bucket_name, $object);
-    }
+    self::emptyBucket();
     self::$fds_client->deleteBucket(self::$bucket_name);
   }
 
   public function testCreateBucket() {
     if (self::$fds_client->doesBucketExist(self::$bucket_name)) {
+      self::$fds_client->deleteObjectsByPrefix(self::$bucket_name, "");
       self::$fds_client->deleteBucket(self::$bucket_name);
     }
 
@@ -75,17 +72,28 @@ class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
     // $acl->getGrantList()[0]->getGrantee()->getId());
 
     $to_set_acl = new AccessControlList();
-    $to_set_acl->addGrant(new Grant(new Grantee("test"), Permission::READ));
+    $to_set_acl->addGrant(new Grant(new Grantee("test_read"), Permission::READ));
+    $to_set_acl->addGrant(new Grant(new Grantee("123"), Permission::SSO_WRITE));
     self::$fds_client->setBucketAcl(self::$bucket_name, $to_set_acl);
     $got_acl = self::$fds_client->getBucketAcl(self::$bucket_name);
     $this->assertNotNull($got_acl);
     $grants = $got_acl->getGrantList();
     $grantees =  array();
+    $aclCnt = 0;
     foreach ($grants as $key => $value) {
-      $grantees[$key] = $value->getGrantee()->getId();
+      $id = $value->getGrantee()->getId();
+      $grantees[$key] = $id;
+      if ($id === "test_read") {
+        $this->assertEquals(Permission::READ, $value->getPermission());
+        $aclCnt += 1;
+      } else if ($id === "123") {
+        $this->assertEquals(Permission::SSO_WRITE, $value->getPermission());
+        $aclCnt += 1;
+      }
     }
     sort($grantees);
-    $this->assertEquals(2, count($grantees));
+    $this->assertEquals(3, count($grantees));
+    $this->assertEquals(2, $aclCnt);
   }
 
   /**
@@ -122,6 +130,19 @@ class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
   public function testPutAndGetObject() {
     $object_name = "test.txt";
     $content = "hello world";
+    $this->putAndGetObject($object_name, $content);
+  }
+
+  /**
+   * @depends testCreateBucket
+   */
+  public function testPutAndGetEmptyObject() {
+    $object_name = "test-empty.txt";
+    $content = "";
+    $this->putAndGetObject($object_name, $content);
+  }
+
+  private function putAndGetObject($object_name, $content) {
     $result = self::$fds_client->putObject(self::$bucket_name,
       $object_name, $content);
     $this->assertNotNull($result);
@@ -226,6 +247,82 @@ class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
       self::$bucket_name, $object_name));
   }
 
+  public function testDeleteObjects() {
+    if (!self::$fds_client->doesBucketExist(self::$bucket_name)) {
+      self::$fds_client->createBucket(self::$bucket_name);
+    }
+
+    $this->assertTrue(self::$fds_client->doesBucketExist(self::$bucket_name));
+    $object_name_list = array("1", "2", "3");
+    $object_content = "bla";
+    foreach ($object_name_list as $object_name) {
+      $result = self::$fds_client->putObject(self::$bucket_name, $object_name, $object_content);
+      $this->assertNotNull($result);
+      $this->assertEquals($object_name, $result->getObjectName());
+      $this->assertTrue(self::$fds_client->doesObjectExist(self::$bucket_name, $object_name));
+    }
+    $result_list = self::$fds_client->deleteObjects(self::$bucket_name, $object_name_list);
+    $this->assertEquals(0, count($result_list));
+    foreach ($object_name_list as $object_name) {
+      $this->assertFalse(self::$fds_client->doesObjectExist(self::$bucket_name, $object_name));
+      self::$fds_client->restoreObject(self::$bucket_name, $object_name);
+      $this->assertTrue(self::$fds_client->doesObjectExist(self::$bucket_name, $object_name));
+    }
+
+    $name_list_too_long = array();
+    for ($i = 0; $i < FDSClientConfiguration::DEFAULT_MAX_BATCH_DELETE_SIZE + 1; ++$i) {
+      array_push($name_list_too_long, strval($i));
+    }
+    try {
+      self::$fds_client->deleteObjects(self::$bucket_name, $name_list_too_long);
+      $this->assertFail();
+    } catch (\Exception $e) {
+      $this->assertTrue(strpos($e->getMessage(), "400") === false);
+    }
+
+    // try null or non exist object name
+    $invalid_or_non_exist_name_list = array(null, "i-do-not-exist", "*", ".", "");
+    $result_list = self::$fds_client->deleteObjects(self::$bucket_name, $invalid_or_non_exist_name_list);
+    self::assertTrue(count($result_list) === 2);
+
+    // check object not delete by invalid deletion call
+    foreach ($object_name_list as $object_name) {
+      self::assertTrue(self::$fds_client->doesObjectExist(self::$bucket_name, $object_name));
+    }
+  }
+
+  public function testDeleteObjectsByPrefix() {
+    if (!self::$fds_client->doesBucketExist(self::$bucket_name)) {
+      self::$fds_client->createBucket(self::$bucket_name);
+    }
+    $this->assertTrue(self::$fds_client->doesBucketExist(self::$bucket_name));
+
+    $object_name_list = array("1/1", "2/2", "3/3", "1/1/1", "2/2/2", "3/3/3", "1/2/2", "3/2/2");
+    $object_content = "bla";
+    foreach ($object_name_list as $object_name) {
+      self::$fds_client->putObject(self::$bucket_name, $object_name, $object_content);
+      $this->assertTrue(self::$fds_client->doesObjectExist(self::$bucket_name, $object_name));
+    }
+
+    $result = self::$fds_client->deleteObjectsByPrefix(self::$bucket_name, "2/2");
+    self::assertTrue(count($result) === 0);
+    foreach ($object_name_list as $object_name) {
+      if (strpos($object_name, "2/2") === 0) {
+        var_dump($object_name);
+        ob_flush();
+        self::assertFalse(self::$fds_client->doesObjectExist(self::$bucket_name, $object_name));
+        self::$fds_client->restoreObject(self::$bucket_name, $object_name);
+        $this->assertTrue(self::$fds_client->doesObjectExist(self::$bucket_name, $object_name));
+      } else {
+        self::assertTrue(self::$fds_client->doesObjectExist(self::$bucket_name, $object_name));
+      }
+    }
+
+    // try prefix not exist
+    $result = self::$fds_client->deleteObjectsByPrefix(self::$bucket_name, "blagla");
+    self::assertTrue(count($result) === 0);
+  }
+
   /**
    * @depends testCreateBucket
    */
@@ -292,6 +389,9 @@ class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
     }
   }
 
+  /**
+   * @depends testCreateBucket
+   */
   public function testPresigedUri() {
     $object_name = "中文测试";
     $content = "presigned";
@@ -300,13 +400,29 @@ class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
         $object_name, time() * 1000 + 60000);
     $download = file_get_contents($uri);
     $this->assertEquals($content, $download);
+
+    // test put object with presigned uri, content-type setted
+
+    $object_name = "presigned_uri";
+    $content = "blahblah";
+    // get uri
+    $content_type = "text/blah";
+    $uri = self::$fds_client->generatePresignedUri(self::$bucket_name, $object_name,
+        time() * 1000 + 60000, "PUT", $content_type);
+    // put object
+    $headers = array();
+    $headers[Common::CONTENT_TYPE] = $content_type;
+    $request = Request::put($uri, $content);
+    $response = $request->addHeaders($headers)->send();
+
+    // check object
+    $object = self::$fds_client->getObject(self::$bucket_name, $object_name);
+    $this->assertNotNull($object);
+    $this->assertEquals($content, $object->getObjectContent());
+    $this->assertEquals($content_type, $object->getObjectMetadata()->getContentType());
   }
 
   private function emptyBucket() {
-    $listing = self::$fds_client->listObjects(self::$bucket_name);
-    foreach ($listing->getObjectSummaries() as $summary) {
-      $object = $summary->getObjectName();
-      self::$fds_client->deleteObject(self::$bucket_name, $object);
-    }
+    self::$fds_client->deleteObjectsByPrefix(self::$bucket_name, "");
   }
 }

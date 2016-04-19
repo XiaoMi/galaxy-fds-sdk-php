@@ -12,6 +12,7 @@ class FDSObjectListing {
 
   private $bucket_name;
   private $prefix;
+  private $delimiter;
   private $marker;
   private $next_marker;
   private $max_keys;
@@ -29,6 +30,10 @@ class FDSObjectListing {
 
       if (isset($json->prefix)) {
         $listing->setPrefix($json->prefix);
+      }
+
+      if (isset($json->delimiter)) {
+        $listing->setDelimiter($json->delimiter);
       }
 
       if (isset($json->marker)) {
@@ -122,6 +127,13 @@ class FDSObjectListing {
     $this->prefix = $prefix;
   }
 
+  public function getDelimiter() {
+    return $this->delimiter;
+  }
+
+  public function setDelimiter($delimiter) {
+    $this->delimiter = $delimiter;
+  }
   public function isTruncated() {
     return $this->truncated;
   }
