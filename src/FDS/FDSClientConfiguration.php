@@ -12,10 +12,9 @@ class FDSClientConfiguration {
 
   const URI_HTTP_PREFIX = "http://";
   const URI_HTTPS_PREFIX = "https://";
-  const URI_FILES = "files";
   const URI_CDN = "cdn";
-  const URI_FDS_SUFFIX = ".fds.api.xiaomi.com/";
-  const URI_FDS_SSL_SUFFIX = ".fds-ssl.api.xiaomi.com/";
+  const URI_SUFFIX = "fds.api.xiaomi.com";
+  const URI_CDN_SUFFIX = "fds.api.mi-img.com";
   const DEFAULT_RETRY_NUM = 3;
   const DEFAULT_CONNECTION_TIMEOUT_SECS = 30;
   const DEFAULT_MAX_BATCH_DELETE_SIZE = 100;
@@ -36,7 +35,7 @@ class FDSClientConfiguration {
 
   public function __construct() {
     $this->enable_https = true;
-    $this->region_name = "";
+    $this->region_name = "cnbj0";
     $this->enable_cdn_for_upload = false;
     $this->enable_cdn_for_download = true;
     $this->enable_md5_calculate = false;
@@ -123,30 +122,13 @@ class FDSClientConfiguration {
     }
 
     $uri = $this->enable_https ? self::URI_HTTPS_PREFIX : self::URI_HTTP_PREFIX;
-    $uri .= $this->getBaseUriPrefix($enableCdn, $this->region_name);
-    $uri .= $this->getBaseUriSuffix($enableCdn, $this->enable_https);
-    return $uri;
-  }
-
-  private function  getBaseUriPrefix($enableCdn, $regionName) {
-    if (empty($regionName)) {
-      if ($enableCdn) {
-        return self::URI_CDN;
-      }
-      return self::URI_FILES;
+    if ($enableCdn) {
+      $uri .= self::URI_CDN . '.' . $this->region_name . '.' . self::URI_CDN_SUFFIX;
     } else {
-      if ($enableCdn) {
-        return $regionName . '-' . self::URI_CDN;
-      }
-      return $regionName . '-' . self::URI_FILES;
+      $uri .= $this->region_name . '.' . self::URI_SUFFIX;
     }
-  }
-
-  private function getBaseUriSuffix($enableCdn, $enableHttps) {
-    if ($enableCdn && $enableHttps) {
-      return self::URI_FDS_SSL_SUFFIX;
-    }
-    return self::URI_FDS_SUFFIX;
+    $uri .= '/';
+    return $uri;
   }
 
   public function isDebugEnabled() {
