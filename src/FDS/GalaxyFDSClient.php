@@ -831,7 +831,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $upload_id, $metadata, $upload_part_result_list) {
     $uri = $this->fds_config->getBaseUri() . $bucket_name . "/" . $object_name .
         "?uploadId=" . $upload_id;
-    $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
+    $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON, $metadata);
 
     $response = $this->invoke(Action::CompleteMultipartUpload, $uri, $headers,
         Http::PUT, null, json_encode($upload_part_result_list));
