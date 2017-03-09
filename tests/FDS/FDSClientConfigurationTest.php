@@ -19,7 +19,7 @@ class FDSClientConfigurationTest extends \PHPUnit_Framework_TestCase {
 
   public function testDefaultConfigurationValue() {
     $fds_config = new FDSClientConfiguration();
-    $this->assertEquals("", $fds_config->getRegionName());
+    $this->assertEquals("cnbj0", $fds_config->getRegionName());
     $this->assertEquals(true, $fds_config->isHttpsEnabled());
     $this->assertEquals(false, $fds_config->isCdnEnabledForUpload());
     $this->assertEquals(true, $fds_config->isCdnEnabledForDownload());
@@ -69,5 +69,14 @@ class FDSClientConfigurationTest extends \PHPUnit_Framework_TestCase {
     $fds_config->enableHttps(false);
     $this->assertEquals("http://" . $region_name . '.' . self::URI_SUFFIX . '/',
         $fds_config->buildBaseUri(false));
+
+    $endpoint = "cnbj1.api.xiaomi.net";
+    $fds_config->enableHttps(false);
+    $fds_config->setEndpoint($endpoint);
+    $this->assertEquals("http://" . $endpoint . "/", $fds_config->buildBaseUri(false));
+    $this->assertEquals("http://" . $endpoint . "/", $fds_config->buildBaseUri(true));
+    $fds_config->enableHttps(true);
+    $this->assertEquals("https://" . $endpoint . "/", $fds_config->buildBaseUri(false));
+    $this->assertEquals("https://" . $endpoint . "/", $fds_config->buildBaseUri(true));
   }
 }

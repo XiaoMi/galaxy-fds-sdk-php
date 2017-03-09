@@ -17,7 +17,7 @@ class FDSClientConfiguration {
   const URI_CDN_SUFFIX = "fds.api.mi-img.com";
   const DEFAULT_RETRY_NUM = 3;
   const DEFAULT_CONNECTION_TIMEOUT_SECS = 30;
-  const DEFAULT_MAX_BATCH_DELETE_SIZE = 100;
+  const DEFAULT_MAX_BATCH_DELETE_SIZE = 1000;
 
   private $region_name;
   private $enable_https;
@@ -29,6 +29,7 @@ class FDSClientConfiguration {
   private $retry;
   private $connection_timeout_secs;
   private $batch_delete_size;
+  private $endpoint;
 
   private $enable_unit_test_mode;
   private $base_uri_for_unit_test;
@@ -41,6 +42,7 @@ class FDSClientConfiguration {
     $this->enable_md5_calculate = false;
     $this->enable_debug = false;
     $this->enable_metrics = false;
+    $this->endpoint = "";
 
     $this->enable_unit_test_mode = false;
     $this->base_uri_for_unit_test = "";
@@ -100,6 +102,14 @@ class FDSClientConfiguration {
     $this->base_uri_for_unit_test = $base_uri_for_unit_test;
   }
 
+  public function setEndpoint($endpoint) {
+    $this->endpoint = $endpoint;
+  }
+
+  public function getEndpoint($endpoint) {
+    return $this->endpoint;
+  }
+
   public function getBaseUri() {
     return $this->buildBaseUri(false);
   }
@@ -122,7 +132,10 @@ class FDSClientConfiguration {
     }
 
     $uri = $this->enable_https ? self::URI_HTTPS_PREFIX : self::URI_HTTP_PREFIX;
-    if ($enableCdn) {
+
+    if (!empty($this->endpoint)) {
+      $uri .= $this->endpoint;
+    } else if ($enableCdn) {
       $uri .= self::URI_CDN . '.' . $this->region_name . '.' . self::URI_CDN_SUFFIX;
     } else {
       $uri .= $this->region_name . '.' . self::URI_SUFFIX;
