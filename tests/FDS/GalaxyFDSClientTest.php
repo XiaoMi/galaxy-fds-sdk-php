@@ -19,6 +19,7 @@ use FDS\model\FDSObjectMetadata;
 use FDS\model\Grant;
 use FDS\model\Grantee;
 use FDS\model\Permission;
+use FDS\model\UploadPartResultList;
 use Httpful\Request;
 
 class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
@@ -420,6 +421,34 @@ class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
     $this->assertNotNull($object);
     $this->assertEquals($content, $object->getObjectContent());
     $this->assertEquals($content_type, $object->getObjectMetadata()->getContentType());
+  }
+
+  /**
+   * @depends testCreateBucket
+   */
+  public function testMultipartUpload() {
+    $object_name = "multipart-upload";
+    $content = "multipart-upload";
+    $initMultipartUploadResult = self::$fds_client->initMultipartUpload(self::$bucket_name, $object_name);
+
+    $uploadPartResult = self::$fds_client->uploadPart(self::$bucket_name,
+      $object_name, $initMultipartUploadResult->getUploadId(), 1, $content);
+
+
+    $uploadPartResultArray = array();
+    array_push($uploadPartResultArray, $uploadPartResult);
+    $uploadPartResultList = new UploadPartResultList();
+    $uploadPartResultList->setUploadPartResultList($uploadPartResultArray);
+    $metadata = new FDSObjectMetadata();
+    $metadata->setContentType("text/html");
+
+    self::$fds_client->completeMultipartUpload(self::$bucket_name, $object_name,
+      $initMultipartUploadResult->getUploadId(), $metadata, $uploadPartResultList);
+
+    $object = self::$fds_client->getObject(self::$bucket_name, $object_name);
+    $actualObjectContent = $object->getObjectContent();
+    $this->assertEquals($content, $actualObjectContent);
+    $this->assertEquals("text/html", $object->getObjectMetadata()->getContentType());
   }
 
   private function emptyBucket() {

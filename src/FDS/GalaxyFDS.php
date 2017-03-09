@@ -225,7 +225,7 @@ interface GalaxyFDS {
    *
    * @param string $bucket_name The name of the bucket
    * @param $object_name_list array of names to delete, count($object_name_list)
-   *        should less than 100
+   *        should less than 1k
    * @return array of failure reason:
    * (...,
    *   (
