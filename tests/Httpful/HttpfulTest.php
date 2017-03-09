@@ -24,7 +24,7 @@ define('TEST_SERVER', WEB_SERVER_HOST . ':' . WEB_SERVER_PORT);
 class HttpfulTest extends \PHPUnit_Framework_TestCase
 {
     const TEST_SERVER = TEST_SERVER;
-    const TEST_URL = '127.0.0.1:8008';
+    const TEST_URL = 'http://127.0.0.1:8008';
     const TEST_URL_400 = 'http://127.0.0.1:8008/400';
 
     const SAMPLE_JSON_HEADER =
