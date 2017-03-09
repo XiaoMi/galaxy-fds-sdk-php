@@ -9,7 +9,7 @@
     php ./examples/galaxy-fds.php (注意: 需要在样例中设置正确的App Key和Secret)
 
 ##### Release Notes:
-* 20170309
+* 20170309 - v1.0.0
     * Fix metadata not set in completeMultipartUpload
     * Add setEndpoint in FDSClientConfiguration
 
