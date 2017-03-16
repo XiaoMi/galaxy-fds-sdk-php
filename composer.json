@@ -7,7 +7,6 @@
     "api",
     "sdk"
   ],
-  "version": "1.0.1",
   "license": "Apache",
   "autoload": {
     "classmap": ["."]
