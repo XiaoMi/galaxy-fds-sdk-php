@@ -25,6 +25,7 @@ abstract class Common {
   const DATE = "date";
 
   const REQUEST_TIME_LIMIT = 900000; // 15min
+  const RANGE = "range";
 
   // Pre-defined object metadata headers
   const CACHE_CONTROL = "cache-control";

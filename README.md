@@ -9,6 +9,12 @@
     php ./examples/galaxy-fds.php (注意: 需要在样例中设置正确的App Key和Secret)
 
 ##### Release Notes:
+
+* 20180709 - v1.0.2
+    * add empty check in signer canonicalizeResource
+    * abortMultipartUpload bug fix
+    * support range get object
+
 * 20170316 - v1.0.1
     * Remove version field in composer config
 

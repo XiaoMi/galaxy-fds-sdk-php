@@ -134,7 +134,7 @@ class Signer {
           $result .= "&" . $key;
         }
 
-        if (!empty($value)) {
+        if (!(empty($value) && $value !== "0")) {
           $result .= "=" . $value;
         }
       }
