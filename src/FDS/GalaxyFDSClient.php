@@ -38,9 +38,11 @@ class GalaxyFDSClient implements GalaxyFDS {
 
   const DATE_FORMAT = 'D, d M Y H:i:s \G\M\T';
   const SIGN_ALGORITHM = "sha1";
+  const HTTP_PARTIAL_OK = 206;
   const HTTP_OK = 200;
   const HTTP_NOT_FOUND = 404;
   const APPLICATION_OCTET_STREAM = "application/octet-stream";
+  const LONG_MAX = 9223372036854775807;
 
   private $credential;
   private $fds_config;
@@ -293,15 +295,18 @@ class GalaxyFDSClient implements GalaxyFDS {
     }
   }
 
-  public function getObject($bucket_name, $object_name) {
+  public function getObject($bucket_name, $object_name, $start = 0, $end = self::LONG_MAX) {
     $uri = $this->formatUri($this->fds_config->getDownloadBaseUri(),
         $bucket_name . "/" . $object_name);
     $headers = $this->prepareRequestHeader($uri, Http::GET, NULL);
+    if ($start != 0 && $end != self::LONG_MAX) {
+      $headers[Common::RANGE] = "bytes=" . $start . "-" . $end;
+    }
 
     $response = $this->invoke(Action::GetObject, $uri, $headers, Http::GET,
         self::APPLICATION_OCTET_STREAM, null);
 
-    if ($response->code == self::HTTP_OK) {
+    if ($response->code == self::HTTP_OK || $response->code == self::HTTP_PARTIAL_OK) {
       $object = new FDSObject();
       $object->setObjectContent($response->raw_body);
 
@@ -831,7 +836,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $upload_id, $metadata, $upload_part_result_list) {
     $uri = $this->fds_config->getBaseUri() . $bucket_name . "/" . $object_name .
         "?uploadId=" . $upload_id;
-    $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON, $metadata);
+    $headers = $this->prepareRequestHeader($uri, Http::PUT, self::APPLICATION_OCTET_STREAM, $metadata);
 
     $response = $this->invoke(Action::CompleteMultipartUpload, $uri, $headers,
         Http::PUT, null, json_encode($upload_part_result_list));
@@ -849,11 +854,11 @@ class GalaxyFDSClient implements GalaxyFDS {
 
   public function abortMultipartUpload($bucket_name, $object_name, $upload_id) {
     $uri = $this->fds_config->getBaseUri() . $bucket_name . "/" . $object_name .
-        "?uploadId=" + $upload_id;
-    $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON);
+      "?uploadId=" . $upload_id;
+    $headers = $this->prepareRequestHeader($uri, Http::DELETE, Mime::JSON);
 
     $response = $this->invoke(Action::AbortMultipartUpload, $uri, $headers,
-        Http::PUT, null, null);
+        Http::DELETE, null, null);
 
     if ($response->code != self::HTTP_OK) {
       $message = "Abort multipart failed, status=" . $response->code .

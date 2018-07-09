@@ -40,6 +40,11 @@ $object = $fds_client->getObject($bucket_name, $object_name);
 $content = $object->getObjectContent();
 print_r($content);
 
+// Range get the object and check content
+$object = $fds_client->getObject($bucket_name, $object_name, 1, 2);
+$content = $object->getObjectContent();
+print_r($content);
+
 // Delete the object
 $fds_client->deleteObject($bucket_name, $object_name);
 
