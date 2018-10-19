@@ -106,7 +106,7 @@ class Signer {
 
   static function canonicalizeResource($uri) {
     $result = "";
-    $result .= parse_url($uri, PHP_URL_PATH);
+    $result .= urldecode(parse_url(urlencode($uri), PHP_URL_PATH));
 
     // 1. Parse and sort subresource
     $sorted_params = array();
