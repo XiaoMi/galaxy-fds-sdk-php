@@ -104,9 +104,31 @@ class Signer {
     return $result;
   }
 
+  static function mb_parse_url($url) {
+    $enc_url = preg_replace_callback(
+      '%[^:/@?&=#]+%usD',
+      function ($matches) {
+        return urlencode($matches[0]);
+      },
+      $url
+    );
+
+    $parts = parse_url($enc_url);
+
+    if($parts === false) {
+      throw new \InvalidArgumentException('Malformed URL: ' . $url);
+    }
+
+    foreach($parts as $name => $value) {
+      $parts[$name] = urldecode($value);
+    }
+
+    return $parts;
+  }
+
   static function canonicalizeResource($uri) {
     $result = "";
-    $result .= urldecode(parse_url(urlencode($uri), PHP_URL_PATH));
+    $result .= self::mb_parse_url($uri)["path"];
 
     // 1. Parse and sort subresource
     $sorted_params = array();
