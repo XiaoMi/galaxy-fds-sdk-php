@@ -18,7 +18,7 @@ class FDSObjectMetadata {
   static $PRE_DEFINED_METADATA = array(
     Common::CACHE_CONTROL, Common::CONTENT_ENCODING,
     Common::CONTENT_LENGTH, Common::CONTENT_MD5,
-    Common::CONTENT_TYPE
+    Common::CONTENT_TYPE, Common::LAST_MODIFIED
   );
   private $metadata = array();
 
