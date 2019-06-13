@@ -3,6 +3,8 @@
  * @author nick fox <quixand gmail com>
  */
 namespace Httpful\Test;
+require(dirname(dirname(dirname(__FILE__))) . '/bootstrap.php');
+\Httpful\Bootstrap::init();
 
 class requestTest extends \PHPUnit_Framework_TestCase
 {

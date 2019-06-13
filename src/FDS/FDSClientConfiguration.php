@@ -132,7 +132,6 @@ class FDSClientConfiguration {
     }
 
     $uri = $this->enable_https ? self::URI_HTTPS_PREFIX : self::URI_HTTP_PREFIX;
-
     if (!empty($this->endpoint)) {
       $uri .= $this->endpoint;
     } else if ($enableCdn) {
