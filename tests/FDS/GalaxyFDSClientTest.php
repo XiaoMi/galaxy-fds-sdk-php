@@ -9,6 +9,7 @@
 namespace FDS\Test;
 
 require_once(dirname(dirname(dirname(__FILE__))) . "/bootstrap.php");
+require_once(dirname(dirname(dirname(__FILE__))) . "/tests/test-common.php");
 
 use FDS\auth\Common;
 use FDS\credential\BasicFDSCredential;
@@ -33,9 +34,9 @@ class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
     $fdsConfig->setEnableMd5Calculate(true);
     $fdsConfig->enableUnitTestMode(true);
     $fdsConfig->setBaseUriforunittest("http://files.fds.api.xiaomi.com/");
-    self::$credential = new BasicFDSCredential("access_key", "access_secret");
+    self::$credential = new BasicFDSCredential(ACCESS_ID, ACCESS_SECRET);
     self::$fds_client = new GalaxyFDSClient(self::$credential, $fdsConfig);
-    self::$bucket_name = "test-php-sdk-bucket-name";
+    self::$bucket_name = "test-php-sdk-bucket-".substr(md5(rand()),0,7);
   }
 
   public static function tearDownAfterClass() {
@@ -451,7 +452,7 @@ class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
     $this->assertEquals("text/html", $object->getObjectMetadata()->getContentType());
   }
 
-  private function emptyBucket() {
+  private static function emptyBucket() {
     self::$fds_client->deleteObjectsByPrefix(self::$bucket_name, "");
   }
 }

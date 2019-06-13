@@ -12,6 +12,8 @@ namespace Httpful\Test;
 require(dirname(dirname(dirname(__FILE__))) . '/bootstrap.php');
 \Httpful\Bootstrap::init();
 
+require_once(dirname(dirname(__FILE__)) . '/test-common.php');
+
 use Httpful\Httpful;
 use Httpful\Request;
 use Httpful\Mime;

@@ -38,8 +38,8 @@ class GalaxyFDSClient implements GalaxyFDS {
 
   const DATE_FORMAT = 'D, d M Y H:i:s \G\M\T';
   const SIGN_ALGORITHM = "sha1";
-  const HTTP_PARTIAL_OK = 206;
   const HTTP_OK = 200;
+  const HTTP_PARTIAL_OK = 206;
   const HTTP_NOT_FOUND = 404;
   const APPLICATION_OCTET_STREAM = "application/octet-stream";
   const LONG_MAX = 9223372036854775807;
@@ -854,7 +854,7 @@ class GalaxyFDSClient implements GalaxyFDS {
 
   public function abortMultipartUpload($bucket_name, $object_name, $upload_id) {
     $uri = $this->fds_config->getBaseUri() . $bucket_name . "/" . $object_name .
-      "?uploadId=" . $upload_id;
+        "?uploadId=" . $upload_id;
     $headers = $this->prepareRequestHeader($uri, Http::DELETE, Mime::JSON);
 
     $response = $this->invoke(Action::AbortMultipartUpload, $uri, $headers,

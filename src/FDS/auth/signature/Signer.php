@@ -181,7 +181,7 @@ class Signer {
       $params = array();
       parse_str($query, $params);
       if (array_key_exists(Common::EXPIRES, $params)) {
-        return intval($params[Common::EXPIRES]);
+        return $params[Common::EXPIRES];
       }
     }
     return 0;

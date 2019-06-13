@@ -9,10 +9,11 @@
 require(__DIR__ . "/../bootstrap.php");
 
 // Construct the FDS client
-$access_key = "your_access_key";
-$access_secret = "your_access_secret";
+$access_key = "";
+$access_secret = "";
 $credential = new \FDS\credential\BasicFDSCredential($access_key, $access_secret);
 $fds_config = new \FDS\FDSClientConfiguration();
+$fds_config->setEndpoint("awsbj0-fds.api.xiaomi.net");
 $fds_config->enableHttps(true);
 $fds_config->enableCdnForUpload(false);
 $fds_config->enableCdnForDownload(true);
@@ -40,10 +41,11 @@ $object = $fds_client->getObject($bucket_name, $object_name);
 $content = $object->getObjectContent();
 print_r($content);
 
-// Range get the object and check content
+// Get the object and check content
 $object = $fds_client->getObject($bucket_name, $object_name, 1, 2);
 $content = $object->getObjectContent();
 print_r($content);
+
 
 // Delete the object
 $fds_client->deleteObject($bucket_name, $object_name);
@@ -54,4 +56,3 @@ $fds_client->deleteBucket($bucket_name);
 // Check bucket existence
 $exist = $fds_client->doesBucketExist($bucket_name);
 assert(!$exist);
-
