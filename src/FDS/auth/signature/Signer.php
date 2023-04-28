@@ -128,11 +128,14 @@ class Signer {
 
   static function canonicalizeResource($uri) {
     $result = "";
-    $result .= self::mb_parse_url($uri)["path"];
+    $result .= rawurldecode(self::mb_parse_url($uri)["path"]);
 
     // 1. Parse and sort subresource
     $sorted_params = array();
     $query = parse_url($uri, PHP_URL_QUERY);
+    if (!$query) {
+      return $result;
+    }
     $params = array();
     parse_str($query, $params);
     foreach ($params as $key => $value) {
@@ -157,7 +160,7 @@ class Signer {
         }
 
         if (!(empty($value) && $value !== "0")) {
-          $result .= "=" . $value;
+          $result .= "=" . rawurldecode($value);
         }
       }
     }
