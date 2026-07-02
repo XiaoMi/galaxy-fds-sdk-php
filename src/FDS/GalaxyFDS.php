@@ -309,6 +309,13 @@ interface GalaxyFDS {
    */
   public function initMultipartUpload($bucket_name, $object_name);
 
+  /** Init a multipart copy session
+   * @param $bucket_name
+   * @param $object_name
+   * @return mixed
+   */
+  public function initMultipartUploadCopy($bucket_name, $object_name);
+
   /** Upload a part
    * @param $bucket_name
    * @param $object_name
@@ -319,6 +326,21 @@ interface GalaxyFDS {
    */
   public function uploadPart($bucket_name, $object_name, $upload_id,
       $part_number, $content);
+
+  /** Copy a part
+   * @param $bucket_name
+   * @param $object_name
+   * @param $upload_id
+   * @param $part_number
+   * @param $source_bucket_name
+   * @param $source_object_name
+   * @param $start_byte
+   * @param $end_byte
+   * @return mixed
+   */
+  public function uploadPartCopy($bucket_name, $object_name, $upload_id,
+                                 $part_number, $source_bucket_name, $source_object_name,
+                                 $start_byte = null, $end_byte = null);
 
   /** Complete the multipart upload
    * @param $bucket_name

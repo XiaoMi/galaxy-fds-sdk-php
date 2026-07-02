@@ -38,7 +38,7 @@ class FDSClientConfiguration {
     $this->enable_https = true;
     $this->region_name = "cnbj0";
     $this->enable_cdn_for_upload = false;
-    $this->enable_cdn_for_download = true;
+    $this->enable_cdn_for_download = false;
     $this->enable_md5_calculate = false;
     $this->enable_debug = false;
     $this->enable_metrics = false;
