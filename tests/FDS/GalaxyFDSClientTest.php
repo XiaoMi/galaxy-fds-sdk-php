@@ -22,8 +22,9 @@ use FDS\model\Grantee;
 use FDS\model\Permission;
 use FDS\model\UploadPartResultList;
 use Httpful\Request;
+use PHPUnit\Framework\TestCase;
 
-class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
+class GalaxyFDSClientTest extends TestCase {
 
   private static $credential;
   private static $fds_client;
@@ -33,7 +34,7 @@ class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
     $fdsConfig = new FDSClientConfiguration();
     $fdsConfig->setEnableMd5Calculate(true);
     $fdsConfig->enableUnitTestMode(true);
-    $fdsConfig->setBaseUriforunittest("http://files.fds.api.xiaomi.com/");
+    $fdsConfig->setBaseUriforunittest(BASE_URI_FOR_UNIT_TEST);
     self::$credential = new BasicFDSCredential(ACCESS_ID, ACCESS_SECRET);
     self::$fds_client = new GalaxyFDSClient(self::$credential, $fdsConfig);
     self::$bucket_name = "test-php-sdk-bucket-".substr(md5(rand()),0,7);
@@ -450,6 +451,20 @@ class GalaxyFDSClientTest extends \PHPUnit_Framework_TestCase {
     $actualObjectContent = $object->getObjectContent();
     $this->assertEquals($content, $actualObjectContent);
     $this->assertEquals("text/html", $object->getObjectMetadata()->getContentType());
+
+    //test multipart-upload-copy
+    $copyObjetName = "multipart-upload-copy";
+    $initMultipartCopyResult = self::$fds_client->initMultipartUploadCopy(self::$bucket_name, $copyObjetName);
+    $copyPartResult = self::$fds_client->uploadPartCopy(self::$bucket_name,
+      $copyObjetName, $initMultipartCopyResult->getUploadId(), 1, self::$bucket_name, $object_name, 0, $object->getObjectSummary()->getSize() - 1);
+    $copyPartResultArray = array($copyPartResult);
+    $copyPartResultList = new UploadPartResultList();
+    $copyPartResultList->setUploadPartResultList($copyPartResultArray);
+    self::$fds_client->completeMultipartUpload(self::$bucket_name, $copyObjetName,
+      $initMultipartCopyResult->getUploadId(), $metadata, $copyPartResultList);
+    $copyObject = self::$fds_client->getObject(self::$bucket_name, $copyObjetName);
+    $copyContent = $copyObject->getObjectContent();
+    $this->assertEquals($actualObjectContent, $copyContent);
   }
 
   private static function emptyBucket() {

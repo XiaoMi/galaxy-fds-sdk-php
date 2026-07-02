@@ -570,7 +570,7 @@ class GalaxyFDSClient implements GalaxyFDS {
       $this->credential->getGalaxyAccessSecret(), self::SIGN_ALGORITHM);
 
     $uri = $this->formatUri($base_uri,
-        urlencode($bucket_name) . "/" . urlencode($object_name),
+        $bucket_name . "/" . $object_name,
         Common::GALAXY_ACCESS_KEY_ID . "=" . $this->credential->getGalaxyAccessId(),
         Common::EXPIRES . "=" . $expiration,
         Common::SIGNATURE . "=" . $signature);
@@ -614,8 +614,7 @@ class GalaxyFDSClient implements GalaxyFDS {
     }
 
     // 3. Set authorization information
-    $sign_uri = substr($uri, strpos($uri, "/", strpos($uri, ":") +3));
-    $signature = Signer::signToBase64($http_method, $sign_uri, $headers,
+    $signature = Signer::signToBase64($http_method, $uri, $headers,
       $this->credential->getGalaxyAccessSecret(), self::SIGN_ALGORITHM);
     $auth_string = "Galaxy-V2 " . $this->credential->getGalaxyAccessId()
       . ":" . $signature;
@@ -633,12 +632,26 @@ class GalaxyFDSClient implements GalaxyFDS {
     $uri = "";
     $args = func_get_args();
     foreach ($args as $arg) {
-      if ($count == 0 || $count == 1) {
+      if ($count == 0) {
         $uri .= $arg;
-      } else if ($count == 2) {
-        $uri .= "?" . $arg;
+      } else if ($count == 1) {
+        $arrArg = explode("/", $arg, 2);
+        if (count($arrArg) == 2) {
+          $arrArg[1] = str_replace('%2F', '/',rawurlencode($arrArg[1]));
+          $arg = implode("/", $arrArg);
+        }
+        $uri .= $arg;
       } else {
-        $uri .= "&" . $arg;
+        $arrArg = explode("=", $arg, 2);
+        if (count($arrArg) == 2) {
+          $arrArg[1] = rawurlencode($arrArg[1]);
+          $arg = implode("=", $arrArg);
+        }
+        if ($count == 2) {
+          $uri .= "?" . $arg;
+        } else {
+          $uri .= "&" . $arg;
+        }
       }
       ++$count;
     }
@@ -811,10 +824,31 @@ class GalaxyFDSClient implements GalaxyFDS {
     }
   }
 
+  public function initMultipartUploadCopy($bucket_name, $object_name) {
+    $uri = $this->formatUri($this->fds_config->getBaseUri(),
+      $bucket_name . "/" . $object_name, SubResource::UPLOADS);
+    $metadata = new FDSObjectMetadata();
+    $metadata->addHeader(Common::MULITPART_UPLOAD_MODE, 'MULTI_BLOB');
+    $headers = $this->prepareRequestHeader($uri, Http::PUT, Mime::JSON, $metadata);
+
+    $response = $this->invoke(Action::InitMultipartUpload, $uri, $headers, Http::PUT,
+      null, null);
+
+    if ($response->code == self::HTTP_OK) {
+      $result = InitMultipartUploadResult::fromJson($response->body);
+      return $result;
+    } else {
+      $message = "Init multipart upload failed, status=" . $response->code .
+        ", reason=" . $response->raw_body;
+      $this->printResponse($response);
+      throw new GalaxyFDSClientException($message);
+    }
+  }
+
   public function uploadPart($bucket_name, $object_name, $upload_id,
       $part_number, $content) {
-    $uri = $this->fds_config->getBaseUri() . $bucket_name . "/" . $object_name .
-        "?uploadId=" . $upload_id . "&partNumber=" . $part_number;
+    $uri = $this->formatUri($this->fds_config->getBaseUri(),
+      $bucket_name . "/" . $object_name, "uploadId=" . $upload_id, "partNumber=" . $part_number);
     $headers = $this->prepareRequestHeader($uri, Http::PUT,
         self::APPLICATION_OCTET_STREAM);
 
@@ -832,10 +866,39 @@ class GalaxyFDSClient implements GalaxyFDS {
     }
   }
 
+  public function uploadPartCopy($bucket_name, $object_name, $upload_id,
+                                 $part_number, $source_bucket_name, $source_object_name,
+                                 $start_byte = null, $end_byte = null) {
+    $uri = $this->formatUri($this->fds_config->getBaseUri(),
+      $bucket_name . "/" . $object_name, "uploadId=" . $upload_id, "partNumber=" . $part_number);
+
+    $metadata = new FDSObjectMetadata();
+    $metadata->addHeader(Common::COPY_SOURCE, '/' . $source_bucket_name . '/' . rawurlencode($source_object_name));
+    if ($start_byte !== null && $end_byte !== null) {
+      $metadata->addHeader(Common::COPY_SOURCE_RANGE, 'bytes=' . $start_byte . '-' . $end_byte);
+    }
+
+    $headers = $this->prepareRequestHeader($uri, Http::PUT,
+      self::APPLICATION_OCTET_STREAM, $metadata);
+
+    $response = $this->invoke(Action::UploadPart, $uri, $headers, Http::PUT,
+      null, null);
+
+    if ($response->code == self::HTTP_OK) {
+      $result = UploadPartResult::fromJson($response->body);
+      return $result;
+    } else {
+      $message = "Upload part failed, status=" . $response->code .
+        ", reason=" . $response->raw_body;
+      $this->printResponse($response);
+      throw new GalaxyFDSClientException($message);
+    }
+  }
+
   public function completeMultipartUpload($bucket_name, $object_name,
       $upload_id, $metadata, $upload_part_result_list) {
-    $uri = $this->fds_config->getBaseUri() . $bucket_name . "/" . $object_name .
-        "?uploadId=" . $upload_id;
+    $uri = $this->formatUri($this->fds_config->getBaseUri(),
+      $bucket_name . "/" . $object_name, "uploadId=" . $upload_id);
     $headers = $this->prepareRequestHeader($uri, Http::PUT, self::APPLICATION_OCTET_STREAM, $metadata);
 
     $response = $this->invoke(Action::CompleteMultipartUpload, $uri, $headers,
@@ -853,8 +916,8 @@ class GalaxyFDSClient implements GalaxyFDS {
   }
 
   public function abortMultipartUpload($bucket_name, $object_name, $upload_id) {
-    $uri = $this->fds_config->getBaseUri() . $bucket_name . "/" . $object_name .
-        "?uploadId=" . $upload_id;
+    $uri = $this->formatUri($this->fds_config->getBaseUri(),
+      $bucket_name . "/" . $object_name, "uploadId=" . $upload_id);
     $headers = $this->prepareRequestHeader($uri, Http::DELETE, Mime::JSON);
 
     $response = $this->invoke(Action::AbortMultipartUpload, $uri, $headers,
