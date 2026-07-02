@@ -32,6 +32,9 @@ abstract class Common {
   const CONTENT_ENCODING = "content-encoding";
   const CONTENT_LENGTH = "content-length";
   const LAST_MODIFIED = "last-modified";
+  const MULITPART_UPLOAD_MODE = "x-xiaomi-multipart-upload-mode";
+  const COPY_SOURCE = "x-xiaomi-copy-source";
+  const COPY_SOURCE_RANGE = "x-xiaomi-copy-source-range";
 
   const DEFAULT_FDS_SERVICE_BASE_URI = "http://files.fds.api.xiaomi.com/";
   const DEFAULT_CDN_SERVICE_URI = "http://cdn.fds.api.xiaomi.com/";

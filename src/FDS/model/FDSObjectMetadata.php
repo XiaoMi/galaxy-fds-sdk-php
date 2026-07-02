@@ -16,10 +16,17 @@ class FDSObjectMetadata {
   const USER_DEFINED_METADATA_PREFIX = "x-xiaomi-meta-";
 
   static $PRE_DEFINED_METADATA = array(
-    Common::CACHE_CONTROL, Common::CONTENT_ENCODING,
-    Common::CONTENT_LENGTH, Common::CONTENT_MD5,
-    Common::CONTENT_TYPE, Common::LAST_MODIFIED
+    Common::CACHE_CONTROL,
+    Common::CONTENT_ENCODING,
+    Common::CONTENT_LENGTH,
+    Common::CONTENT_MD5,
+    Common::CONTENT_TYPE,
+    Common::LAST_MODIFIED,
+    Common::MULITPART_UPLOAD_MODE,
+    Common::COPY_SOURCE,
+    Common::COPY_SOURCE_RANGE,
   );
+
   private $metadata = array();
 
   public function addHeader($key, $value) {
